@@ -508,6 +508,19 @@ node --experimental-strip-types src/cli/main.ts --help
 node dist/cli/main.js /path/to/project
 ```
 
+### Docs site
+
+The documentation site lives in `docs/` and is built with VitePress:
+
+```bash
+pnpm run docs:dev      # local dev server
+pnpm run docs:build    # static build to docs/.vitepress/dist
+pnpm run docs:preview  # preview the built site
+```
+
+To deploy to GitHub Pages under a subpath (e.g. `/codebrain-mcp/`), set `base` in
+`docs/.vitepress/config.ts`; VitePress rewrites internal links automatically.
+
 ### Conventions
 
 - TypeScript strict mode, plus `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes`.
