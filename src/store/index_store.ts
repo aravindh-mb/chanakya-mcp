@@ -52,6 +52,15 @@ export interface open_index_store_options {
   readonly tool_version?: string;
 }
 
+/** The stored fingerprint of a file, used to decide whether it needs reindexing. */
+export interface file_stamp {
+  readonly content_hash: string;
+  readonly size: number;
+  readonly modified_time: number;
+  /** When this row was written. Needed to detect racily-clean files. */
+  readonly indexed_at: number;
+}
+
 export interface index_counts {
   readonly files: number;
   readonly symbols: number;
@@ -141,7 +150,7 @@ export class index_store {
     return row === undefined ? undefined : to_code_file(row);
   }
 
-  /** Every indexed path mapped to its content hash. Drives Phase 7 change detection. */
+  /** Every indexed path mapped to its content hash. */
   list_file_hashes(): Map<string, string> {
     const rows = this.#db.prepare('SELECT file_path, content_hash FROM files').all() as Array<{
       file_path: string;
@@ -149,6 +158,37 @@ export class index_store {
     }>;
 
     return new Map(rows.map((row) => [row.file_path, row.content_hash]));
+  }
+
+  /**
+   * Path to size, mtime and hash for every indexed file.
+   *
+   * This is the whole input to incremental change detection, fetched in one
+   * query so deciding what to reindex costs a single round trip rather than one
+   * per file.
+   */
+  list_file_stamps(): Map<string, file_stamp> {
+    const rows = this.#db
+      .prepare('SELECT file_path, content_hash, size, modified_time, indexed_at FROM files')
+      .all() as Array<{
+      file_path: string;
+      content_hash: string;
+      size: number;
+      modified_time: number;
+      indexed_at: number;
+    }>;
+
+    return new Map(
+      rows.map((row) => [
+        row.file_path,
+        {
+          content_hash: row.content_hash,
+          size: row.size,
+          modified_time: row.modified_time,
+          indexed_at: row.indexed_at,
+        },
+      ]),
+    );
   }
 
   get_symbol(id: string): code_symbol | undefined {

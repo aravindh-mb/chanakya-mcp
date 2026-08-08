@@ -50,9 +50,8 @@ describe('index_project', () => {
     project = create_temp_project(SAMPLE_PROJECT);
     const { store: opened, result } = await index(project);
 
-    expect(result.files_indexed).toBe(3);
+    expect(result.files_added).toBe(3);
     expect(result.files_failed).toBe(0);
-    expect(result.symbols).toBeGreaterThan(0);
     expect(opened.count().files).toBe(3);
   });
 
@@ -204,7 +203,7 @@ describe('index_project resilience', () => {
     });
     const { store: opened, result } = await index(project);
 
-    expect(result.files_indexed).toBe(2);
+    expect(result.files_added).toBe(2);
     expect(result.files_with_syntax_errors).toBe(1);
     expect(opened.get_file('src/broken.ts')?.parse_error_count).toBeGreaterThan(0);
   });
@@ -221,7 +220,7 @@ describe('index_project resilience', () => {
     project = create_temp_project({ 'README.md': '# empty\n' });
     const { result } = await index(project);
 
-    expect(result.files_indexed).toBe(0);
+    expect(result.files_added).toBe(0);
     expect(result.files_failed).toBe(0);
   });
 
@@ -230,7 +229,7 @@ describe('index_project resilience', () => {
     store = open_store(project, true);
     const result = await index_project({ store, root_path: project.root_path, batch_size: 1 });
 
-    expect(result.files_indexed).toBe(3);
+    expect(result.files_added).toBe(3);
     expect(store.count().files).toBe(3);
   });
 

@@ -6,6 +6,10 @@ export interface cli_options {
   readonly log_level: log_level;
   readonly show_help: boolean;
   readonly show_version: boolean;
+  /** Keep running and reindex on change. */
+  readonly watch: boolean;
+  /** Reindex every file even if it looks unchanged. */
+  readonly force: boolean;
 }
 
 export const EXIT_CODE = {

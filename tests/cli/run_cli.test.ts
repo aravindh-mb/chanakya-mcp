@@ -100,7 +100,7 @@ describe('run_cli', () => {
     const sink = create_capture();
 
     expect(await run([], temp_dir, sink)).toBe(EXIT_CODE.success);
-    expect(sink.stderr.join('')).toMatch(/indexed \d+ files/);
+    expect(sink.stderr.join('')).toMatch(/\d+ added, \d+ updated, \d+ removed, \d+ unchanged/);
     expect(sink.stderr.join('')).toMatch(/\d+ symbols/);
   });
 

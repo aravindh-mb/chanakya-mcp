@@ -8,10 +8,11 @@ import { create_logger, type logger } from '../core/logger.js';
 import { read_package_meta } from '../core/package_meta.js';
 import { resolve_project_root, type project_root } from '../core/project_root.js';
 import { index_project } from '../indexer/index_project.js';
+import { watch_project } from '../indexer/watch_project.js';
 import { index_store } from '../store/index_store.js';
 import { build_help_text } from './help_text.js';
 import { parse_args } from './parse_args.js';
-import { EXIT_CODE, type exit_code } from './types.js';
+import { EXIT_CODE, type cli_options as cli_options_type, type exit_code } from './types.js';
 
 export const BINARY_NAME = 'code-intelligence-mcp';
 
@@ -58,9 +59,9 @@ export async function run_cli(options: run_cli_options): Promise<exit_code> {
     logger.info(`project root: ${root.root_path}`);
     logger.debug(`data directory: ${root.data_dir_path}`);
 
-    await build_index(root, meta.version, logger);
+    await run_indexing(root, meta.version, cli_options, logger);
 
-    logger.info('ok - incremental indexing and the MCP server are not implemented yet (phase 6 of 20)');
+    logger.info('ok - the MCP server is not implemented yet (phase 7 of 20)');
 
     return EXIT_CODE.success;
   } catch (error: unknown) {
@@ -81,7 +82,12 @@ export async function run_cli(options: run_cli_options): Promise<exit_code> {
  * strand the WAL files, and on Windows would keep the database locked against
  * the next run.
  */
-async function build_index(root: project_root, tool_version: string, log: logger): Promise<void> {
+async function run_indexing(
+  root: project_root,
+  tool_version: string,
+  cli_options: cli_options_type,
+  log: logger,
+): Promise<void> {
   const store = index_store.open({
     data_dir_path: root.data_dir_path,
     project_root: root.root_path,
@@ -89,13 +95,20 @@ async function build_index(root: project_root, tool_version: string, log: logger
   });
 
   try {
-    const result = await index_project({ store, root_path: root.root_path, logger: log });
+    const result = await index_project({
+      store,
+      root_path: root.root_path,
+      logger: log,
+      force: cli_options.force,
+    });
     const counts = store.count();
 
     log.info(
-      `indexed ${result.files_indexed} files in ${result.duration_ms}ms: ` +
-        `${counts.symbols} symbols, ${counts.relationships} relationships`,
+      `indexed in ${result.duration_ms}ms: ${result.files_added} added, ${result.files_updated} updated, ` +
+        `${result.files_removed} removed, ${result.files_unchanged} unchanged`,
     );
+    log.info(`index holds ${counts.symbols} symbols and ${counts.relationships} relationships`);
+    log.debug(`${result.files_parsed} file(s) needed parsing this run`);
     log.debug(`index written to ${root.data_dir_path}`);
 
     if (result.files_with_syntax_errors > 0) {
@@ -108,7 +121,35 @@ async function build_index(root: project_root, tool_version: string, log: logger
         log.debug(`  ${failure.relative_path}: ${failure.reason}`);
       }
     }
+    if (cli_options.watch) {
+      await watch_until_interrupted(root, store, log);
+    }
   } finally {
     store.close();
   }
+}
+
+/**
+ * Watch until the process is interrupted.
+ *
+ * Resolving on SIGINT rather than letting the signal kill the process is what
+ * allows the `finally` above to close the database. An abandoned handle strands
+ * the WAL files and, on Windows, locks the database against the next run.
+ */
+async function watch_until_interrupted(root: project_root, store: index_store, log: logger): Promise<void> {
+  const handle = watch_project({ store, root_path: root.root_path, logger: log });
+  log.info('watching for changes - press Ctrl+C to stop');
+
+  await new Promise<void>((resolve) => {
+    const stop = (): void => {
+      process.off('SIGINT', stop);
+      process.off('SIGTERM', stop);
+      handle.close();
+      log.info('stopped watching');
+      resolve();
+    };
+
+    process.once('SIGINT', stop);
+    process.once('SIGTERM', stop);
+  });
 }

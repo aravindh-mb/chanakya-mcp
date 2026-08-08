@@ -25,6 +25,8 @@ export function parse_args(argv: readonly string[]): cli_options {
   let level: log_level = DEFAULT_LOG_LEVEL;
   let show_help = false;
   let show_version = false;
+  let watch = false;
+  let force = false;
   let flags_terminated = false;
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -68,6 +70,17 @@ export function parse_args(argv: readonly string[]): cli_options {
         level = 'error';
         break;
 
+      case '-w':
+      case '--watch':
+        reject_inline_value(flag, inline_value);
+        watch = true;
+        break;
+
+      case '--force':
+        reject_inline_value(flag, inline_value);
+        force = true;
+        break;
+
       case '--log-level': {
         const raw_value = inline_value ?? argv[index + 1];
         if (inline_value === undefined) {
@@ -91,6 +104,8 @@ export function parse_args(argv: readonly string[]): cli_options {
     log_level: level,
     show_help,
     show_version,
+    watch,
+    force,
   };
 }
 

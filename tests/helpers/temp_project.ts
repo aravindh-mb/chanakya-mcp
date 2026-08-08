@@ -6,7 +6,15 @@
  * repository's own ignore rules.
  */
 
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync, realpathSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  utimesSync,
+  writeFileSync,
+  realpathSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -60,6 +68,17 @@ export interface temp_project {
   /** Absolute path for a project-relative POSIX path. */
   resolve_path(relative_path: string): string;
   write_file(relative_path: string, content: string): void;
+  /** Delete a file from the generated tree. */
+  remove(relative_path: string): void;
+  /**
+   * Push every file's mtime into the past.
+   *
+   * Generated fixtures are written microseconds before they are indexed, which
+   * makes them "racily clean" and forces a re-hash. Real projects contain files
+   * that settled long ago, so backdating is what makes a fixture behave like
+   * one. See `RACY_WINDOW_MS`.
+   */
+  backdate_all(milliseconds_ago: number): void;
   make_directory(relative_path: string): void;
   /**
    * Create a link. Throws on failure: callers must gate on
@@ -78,10 +97,14 @@ export function create_temp_project(files: Readonly<Record<string, string>> = {}
 
   const resolve_path = (relative_path: string): string => join(root_path, ...relative_path.split('/'));
 
+  /** Every path this helper created, so `backdate_all` knows what to touch. */
+  const written_paths = new Set<string>();
+
   const write_file = (relative_path: string, content: string): void => {
     const absolute_path = resolve_path(relative_path);
     mkdirSync(dirname(absolute_path), { recursive: true });
     writeFileSync(absolute_path, content, 'utf8');
+    written_paths.add(relative_path);
   };
 
   for (const [relative_path, content] of Object.entries(files)) {
@@ -92,6 +115,20 @@ export function create_temp_project(files: Readonly<Record<string, string>> = {}
     root_path,
     resolve_path,
     write_file,
+    remove: (relative_path: string): void => {
+      rmSync(resolve_path(relative_path), { force: true });
+      written_paths.delete(relative_path);
+    },
+    backdate_all: (milliseconds_ago: number): void => {
+      const when = new Date(Date.now() - milliseconds_ago);
+      for (const relative_path of written_paths) {
+        try {
+          utimesSync(resolve_path(relative_path), when, when);
+        } catch {
+          // The file may have been removed by the test; nothing to backdate.
+        }
+      }
+    },
     make_directory: (relative_path: string): void => {
       mkdirSync(resolve_path(relative_path), { recursive: true });
     },

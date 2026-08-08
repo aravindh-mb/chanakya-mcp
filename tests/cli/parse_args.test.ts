@@ -11,6 +11,8 @@ describe('parse_args', () => {
       log_level: 'info',
       show_help: false,
       show_version: false,
+      watch: false,
+      force: false,
     });
   });
 
@@ -29,6 +31,21 @@ describe('parse_args', () => {
     ['--version', 'show_version'],
   ] as const)('sets %s', (flag, field) => {
     expect(parse_args([flag])[field]).toBe(true);
+  });
+
+  it.each(['-w', '--watch'])('sets watch via %s', (flag) => {
+    expect(parse_args([flag]).watch).toBe(true);
+  });
+
+  it('sets force via --force', () => {
+    expect(parse_args(['--force']).force).toBe(true);
+  });
+
+  it('combines watch with a project path', () => {
+    const options = parse_args(['./app', '--watch']);
+
+    expect(options.project_path).toBe('./app');
+    expect(options.watch).toBe(true);
   });
 
   it('maps --verbose to the debug level', () => {

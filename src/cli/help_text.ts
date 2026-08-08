@@ -11,6 +11,8 @@ ARGUMENTS
 OPTIONS
   -h, --help              Show this help and exit.
   -v, --version           Show the version and exit.
+  -w, --watch             Keep running and reindex changed files.
+      --force             Reindex every file, ignoring the change check.
       --log-level <level> silent | error | warn | info | debug  (default: info)
       --verbose           Shorthand for --log-level debug.
       --quiet             Shorthand for --log-level error.
@@ -20,6 +22,7 @@ EXAMPLES
   npx @code-intelligence/mcp
   npx @code-intelligence/mcp /path/to/project
   ${binary_name} ./apps/api --verbose
+  ${binary_name} --watch
 
 NOTES
   All analysis runs locally. No source code leaves the machine.

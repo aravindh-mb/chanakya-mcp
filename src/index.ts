@@ -57,6 +57,7 @@ export { hash_content } from './core/hash.js';
 export {
   index_store,
   DATABASE_FILE_NAME,
+  type file_stamp,
   type index_counts,
   type open_index_store_options,
 } from './store/index_store.js';
@@ -69,6 +70,18 @@ export {
   type index_project_options,
   type index_project_result,
 } from './indexer/index_project.js';
+export {
+  detect_changes,
+  normalize_modified_time,
+  type change_set,
+  type detect_changes_options,
+} from './indexer/change_detection.js';
+export {
+  watch_project,
+  DEFAULT_DEBOUNCE_MS,
+  type watch_handle,
+  type watch_project_options,
+} from './indexer/watch_project.js';
 
 export {
   build_symbol_id,

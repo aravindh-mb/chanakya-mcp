@@ -3,9 +3,10 @@
 A local [MCP](https://modelcontextprotocol.io) server that gives AI coding agents — Claude Code, Cursor,
 and any other MCP-compatible client — deep structural knowledge of a JavaScript/TypeScript codebase.
 
-> **Status: early development.** Phases 1–6 of 20 are implemented: package foundation, CLI, project
-> scanner, tree-sitter parsing, the normalized code model, symbol extraction, and the SQLite index.
-> Incremental indexing and the MCP server are not implemented yet. See [Roadmap](#roadmap).
+> **Status: early development.** Phases 1–7 of 20 are implemented: package foundation, CLI, project
+> scanner, tree-sitter parsing, the normalized code model, symbol extraction, the SQLite index, and
+> incremental indexing with a file watcher. Search and the MCP server are not implemented yet.
+> See [Roadmap](#roadmap).
 
 ## Why this exists
 
@@ -53,6 +54,8 @@ code-intelligence-mcp ./apps/api --verbose
 | `[project-path]`      | Project root to index. Defaults to the CWD.              |
 | `-h`, `--help`        | Show help and exit.                                      |
 | `-v`, `--version`     | Show version and exit.                                   |
+| `-w`, `--watch`       | Keep running and reindex changed files.                  |
+| `--force`             | Reindex every file, ignoring the change check.           |
 | `--log-level <level>` | `silent`, `error`, `warn`, `info` (default), or `debug`. |
 | `--verbose`           | Shorthand for `--log-level debug`.                       |
 | `--quiet`             | Shorthand for `--log-level error`.                       |
@@ -245,6 +248,55 @@ The database size is the weak number. Symbol ids embed the full file path and ar
 `parent_id` and across five indexes, so long paths cost a lot. Interning paths and using integer row ids
 is the obvious fix and belongs to the performance phase; it is recorded here rather than glossed over.
 
+## Incremental indexing
+
+Reindexing does not reparse the project. There is one code path, not a separate "full" and
+"incremental" mode — on an empty index every file is simply new — so the rare path cannot rot.
+
+Deciding what changed happens in two stages, because the cheap signal and the trustworthy signal are
+different things:
+
+1. **Size and mtime**, with no file reads. A file matching both is skipped outright.
+2. **Content hash**, for anything that failed stage one. If the hash matches, the file was touched but
+   not edited and the database is left alone.
+
+That split matters because mtime is a poor proxy for content: `git checkout`, `git stash`, a fresh clone
+and many editors rewrite mtimes on files whose bytes never changed. Trusting mtime alone would reindex
+the world after every branch switch; hashing everything would mean reading every file every time.
+
+There is a third rule that is easy to miss and causes silent staleness without it. A file whose mtime
+falls within two seconds of when it was indexed is **never** trusted, even when size and mtime both
+match. Filesystem timestamps are coarse — commonly 1s, and 2s on FAT — so a file edited in the same tick
+it was read carries an identical mtime, and if the edit also left the size unchanged, nothing in the
+fingerprint reveals it. Git calls these entries racily clean and handles them the same way. This was
+found by a test, not by reasoning: an edit that changed content while keeping the byte count went
+undetected.
+
+Measured on this repository (60 files):
+
+| Run                                    | Time   | Files parsed             |
+| -------------------------------------- | ------ | ------------------------ |
+| First index                            | 249 ms | 60                       |
+| Nothing changed                        | 18 ms  | 0                        |
+| One file edited                        | 20 ms  | 1                        |
+| Three files touched, content identical | 24 ms  | 3 checked, **0 written** |
+
+### Watching
+
+`code-intelligence-mcp --watch` keeps the index current as you edit. Changes are debounced (300 ms by
+default) so that one save, or a formatter sweeping the project, produces a single reindex rather than
+dozens. Writes to `.code-intelligence/` are ignored — without that, the indexer's own database write
+would trigger a reindex, which would write again, forever.
+
+The watcher re-runs the normal indexing path rather than reimplementing change tracking. Re-walking
+directories costs a `stat` per file (18 ms here) while parsing is the expensive part, and reusing the
+normal path means the watcher inherits the full ignore rules, including nested `.gitignore` files,
+instead of drifting out of step with them.
+
+Watching uses `fs.watch` in recursive mode rather than adding a dependency. That is a real trade:
+recursive mode is unavailable on some platform and Node combinations, and where it is, the failure is
+reported clearly at startup rather than silently watching nothing.
+
 ## MCP tools
 
 Planned tool surface — small and deliberately non-redundant:
@@ -375,8 +427,8 @@ npm publish --access public
 | 4     | Normalized code model     | Done   |
 | 5     | Symbol extraction         | Done   |
 | 6     | SQLite index              | Done   |
-| 7     | Incremental indexing      | Next   |
-| 8-10  | Search, navigation, graph | —      |
+| 7     | Incremental indexing      | Done   |
+| 8-10  | Search, navigation, graph | Next   |
 | 11    | MCP server                | —      |
 | 12-13 | Safe + symbol-aware edits | —      |
 | 14-17 | Context, semantic, perf   | —      |

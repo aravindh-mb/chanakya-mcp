@@ -1,10 +1,14 @@
 /**
- * The first full indexing pass: scan, parse, extract, store.
+ * Indexing: scan, decide what actually changed, parse only that, store it.
+ *
+ * There is deliberately no separate "full index" and "incremental index" code
+ * path. On an empty index every file is new, so the first run and the thousandth
+ * run execute the same logic. Two code paths would mean two sets of bugs, and
+ * the rarely-taken one would be the broken one.
  *
  * Files are processed one at a time and each result is discarded as soon as it
  * is written, so memory stays flat regardless of repository size. Writes are
- * grouped into batched transactions because committing per file dominates the
- * runtime on a large repository — SQLite fsyncs on each commit.
+ * grouped into batched transactions because SQLite fsyncs on every commit.
  *
  * A file that fails to parse is recorded and skipped, never fatal. One
  * unreadable file in a 10,000 file repository must not cost the other 9,999.
@@ -20,9 +24,12 @@ import { scan_project } from '../scanner/file_scanner.js';
 import type { scan_options, scanned_file } from '../scanner/types.js';
 import { METADATA_KEYS } from '../store/schema.js';
 import type { index_store } from '../store/index_store.js';
+import { detect_changes, normalize_modified_time } from './change_detection.js';
 
-/** Files written per transaction. Large enough to amortize commits, small
- *  enough that a crash loses little and memory stays bounded. */
+/**
+ * Files written per transaction. Large enough to amortize commits, small enough
+ * that a crash loses little and memory stays bounded.
+ */
 export const DEFAULT_WRITE_BATCH_SIZE = 200;
 
 export interface index_project_options {
@@ -30,6 +37,11 @@ export interface index_project_options {
   readonly root_path: string;
   readonly logger?: logger;
   readonly batch_size?: number;
+  /**
+   * Reindex every file even if its fingerprint matches. For recovering from a
+   * suspected-bad index without deleting it.
+   */
+  readonly force?: boolean;
   /** Passed through to the scanner. */
   readonly scan?: Omit<scan_options, 'root_path'>;
 }
@@ -40,11 +52,22 @@ export interface index_failure {
 }
 
 export interface index_project_result {
-  readonly files_indexed: number;
+  /** New files written. */
+  readonly files_added: number;
+  /** Existing files whose content genuinely changed. */
+  readonly files_updated: number;
+  /** Files removed from the index because they are gone from disk. */
+  readonly files_removed: number;
+  /**
+   * Files left alone. Includes both files skipped on size/mtime and files that
+   * were parsed but turned out to hash identically — a touched-but-unedited
+   * file, which is what a branch switch produces.
+   */
+  readonly files_unchanged: number;
   readonly files_failed: number;
   readonly files_with_syntax_errors: number;
-  readonly symbols: number;
-  readonly relationships: number;
+  /** Files actually parsed this run. The cost that incremental indexing avoids. */
+  readonly files_parsed: number;
   readonly duration_ms: number;
   readonly failures: readonly index_failure[];
 }
@@ -53,73 +76,124 @@ export async function index_project(options: index_project_options): Promise<ind
   const started_at = Date.now();
   const { store, root_path } = options;
   const batch_size = options.batch_size ?? DEFAULT_WRITE_BATCH_SIZE;
+  const log = options.logger;
 
   const scan = await scan_project({ root_path, ...options.scan });
-  options.logger?.debug(`indexing ${scan.files.length} files from ${root_path}`);
+  const stored = options.force === true ? new Map() : store.list_file_stamps();
+  const changes = detect_changes({ stored, scanned: scan.files });
 
-  let files_indexed = 0;
-  let files_failed = 0;
-  let files_with_syntax_errors = 0;
-  let symbols = 0;
-  let relationships = 0;
+  log?.debug(
+    `scan found ${scan.files.length} files: ${changes.added.length} new, ` +
+      `${changes.candidates.length} possibly changed, ${changes.unchanged.length} unchanged, ` +
+      `${changes.deleted.length} deleted`,
+  );
+
+  // Deletions first, in one transaction: cascade removes every symbol, edge,
+  // import, export and reference derived from the file.
+  if (changes.deleted.length > 0) {
+    store.transaction(() => {
+      for (const relative_path of changes.deleted) {
+        store.delete_file(relative_path);
+      }
+    });
+  }
+
+  const stats: mutable_stats = {
+    files_added: 0,
+    files_updated: 0,
+    files_unchanged: changes.unchanged.length,
+    files_failed: 0,
+    files_with_syntax_errors: 0,
+    files_parsed: 0,
+  };
   const failures: index_failure[] = [];
 
-  for (let offset = 0; offset < scan.files.length; offset += batch_size) {
-    const batch = scan.files.slice(offset, offset + batch_size);
-    const analyses = await analyze_batch(batch, failures, options.logger);
+  const work: work_item[] = [
+    ...changes.added.map((file) => ({ file, is_new: true })),
+    ...changes.candidates.map((file) => ({ file, is_new: false })),
+  ];
+
+  for (let offset = 0; offset < work.length; offset += batch_size) {
+    const batch = work.slice(offset, offset + batch_size);
+    const writes = await analyze_batch(batch, stored, stats, failures, log);
 
     store.transaction(() => {
-      for (const analysis of analyses) {
+      for (const analysis of writes) {
         store.write_file_analysis(analysis);
       }
     });
-
-    for (const analysis of analyses) {
-      files_indexed += 1;
-      symbols += analysis.symbols.length;
-      relationships += analysis.relationships.length;
-      if (analysis.file.parse_error_count > 0) {
-        files_with_syntax_errors += 1;
-      }
-    }
   }
 
-  files_failed = failures.length;
-
   store.set_metadata(METADATA_KEYS.indexed_at, String(Date.now()));
-  store.optimize();
+
+  // Only worth the cost when something actually moved.
+  if (stats.files_added + stats.files_updated + changes.deleted.length > 0) {
+    store.optimize();
+  }
 
   return {
-    files_indexed,
-    files_failed,
-    files_with_syntax_errors,
-    symbols,
-    relationships,
+    ...stats,
+    files_removed: changes.deleted.length,
     duration_ms: Date.now() - started_at,
     failures,
   };
 }
 
+interface work_item {
+  readonly file: scanned_file;
+  readonly is_new: boolean;
+}
+
+interface mutable_stats {
+  files_added: number;
+  files_updated: number;
+  files_unchanged: number;
+  files_failed: number;
+  files_with_syntax_errors: number;
+  files_parsed: number;
+}
+
 async function analyze_batch(
-  batch: readonly scanned_file[],
+  batch: readonly work_item[],
+  stored: ReadonlyMap<string, { content_hash: string }>,
+  stats: mutable_stats,
   failures: index_failure[],
   log: logger | undefined,
 ): Promise<file_analysis[]> {
-  const analyses: file_analysis[] = [];
+  const writes: file_analysis[] = [];
 
-  for (const file of batch) {
+  for (const item of batch) {
     try {
-      analyses.push(await analyze_file(file));
+      const analysis = await analyze_file(item.file);
+      stats.files_parsed += 1;
+
+      // Second-stage check: the fingerprint said "maybe", the hash decides. A
+      // file touched by a checkout hashes the same and is left untouched, which
+      // keeps a branch switch from rewriting the whole index.
+      if (!item.is_new && stored.get(item.file.relative_path)?.content_hash === analysis.file.content_hash) {
+        stats.files_unchanged += 1;
+        continue;
+      }
+
+      if (analysis.file.parse_error_count > 0) {
+        stats.files_with_syntax_errors += 1;
+      }
+      if (item.is_new) {
+        stats.files_added += 1;
+      } else {
+        stats.files_updated += 1;
+      }
+
+      writes.push(analysis);
     } catch (error: unknown) {
-      // A file that cannot be parsed is recorded and skipped. One bad file in a
-      // large repository must not cost all the others.
       const reason = describe_unknown_error(error);
-      failures.push({ relative_path: file.relative_path, reason });
-      log?.warn(`skipping ${file.relative_path}: ${reason}`);
+      stats.files_failed += 1;
+      failures.push({ relative_path: item.file.relative_path, reason });
+      log?.warn(`skipping ${item.file.relative_path}: ${reason}`);
     }
   }
 
-  return analyses;
+  return writes;
 }
 
 /** Parse and extract one file into the shape the store writes. */
@@ -132,7 +206,8 @@ export async function analyze_file(file: scanned_file): Promise<file_analysis> {
     absolute_path: file.file_path,
     language: file.language,
     size: file.size,
-    modified_time: file.modified_time,
+    // Stored as a whole number so it compares equal to the value read back out.
+    modified_time: normalize_modified_time(file.modified_time),
     // Hashed from the source that was actually parsed, so the stored hash
     // always corresponds to the stored symbols.
     content_hash: hash_content(parsed.source),
