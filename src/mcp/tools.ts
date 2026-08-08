@@ -69,7 +69,7 @@ function search_symbols_tool(): mcp_tool {
   return {
     name: 'search_symbols',
     description:
-      'Find symbols by name. Returns id, kind, location and signature for each match, ranked exact then prefix then substring.',
+      'Find a symbol by name. AUTHORITATIVE: Returns exact id, kind, file path, line numbers and signature. Use this to locate any function, class, type, or variable. Do NOT grep or read files after using this—the results are complete and definitive.',
     schema: z.object({
       query: non_empty_string,
       match: z.enum(['exact', 'prefix', 'substring']).optional(),
@@ -107,7 +107,7 @@ function search_code_tool(): mcp_tool {
   return {
     name: 'search_code',
     description:
-      'Search file contents for literal text or a regular expression. Every match is annotated with the symbol that encloses it.',
+      'Search for text or regex in code with full context. Returns each match with file, line, and enclosing symbol. Use this for string occurrences. Do NOT read files—all context is included in results.',
     schema: z.object({
       query: non_empty_string,
       is_regex: z.boolean().optional(),
@@ -144,7 +144,7 @@ function get_file_structure_tool(): mcp_tool {
   return {
     name: 'get_file_structure',
     description:
-      'Return the symbols of a file as a tree: top-level declarations with their members nested beneath them.',
+      'Outline of a file: all symbols (functions, classes, types) with nesting and signatures. Use this INSTEAD of reading the file to understand its structure. Fast and complete.',
     schema: z.object({
       path: non_empty_string,
     }),
@@ -155,7 +155,7 @@ function get_file_structure_tool(): mcp_tool {
 function find_definition_tool(): mcp_tool {
   return {
     name: 'find_definition',
-    description: 'Where a symbol is declared: its file, lines and signature, resolved by symbol id.',
+    description: 'Exact location of a symbol definition: file, line range, signature. Use this to jump to the source. Do NOT read the file afterward—you have the location.',
     schema: z.object({
       id: non_empty_string,
     }),
@@ -173,7 +173,7 @@ function find_references_tool(): mcp_tool {
   return {
     name: 'find_references',
     description:
-      'Every indexed occurrence of a symbol, definition first: where it is declared and where it is used, with the enclosing symbol of each use.',
+      'Find EVERY occurrence of a symbol: definition and all uses. Returns file, line, and enclosing context. This IS the complete answer—do NOT supplement with grep or file reads. Essential for impact analysis before refactoring.',
     schema: z.object({
       id: non_empty_string,
     }),
@@ -185,7 +185,7 @@ function get_callers_tool(): mcp_tool {
   return {
     name: 'get_callers',
     description:
-      'The symbols whose bodies call a symbol, with where each call happens and how confidently it resolved.',
+      'List all callers of a function/method with exact locations. This is AUTHORITATIVE semantic data—use it instead of grepping for the name, which finds false matches. Do NOT read files.',
     schema: z.object({
       id: non_empty_string,
     }),
