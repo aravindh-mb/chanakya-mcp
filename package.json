@@ -46,6 +46,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "bench": "pnpm run build && node bench/compare.mjs",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
@@ -69,6 +70,7 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.10.2",
     "@vitest/coverage-v8": "^2.1.8",
+    "@vscode/ripgrep": "^1.18.0",
     "eslint": "^9.17.0",
     "prettier": "^3.4.2",
     "tsup": "^8.3.5",
@@ -80,7 +82,8 @@
   "packageManager": "pnpm@10.24.0",
   "pnpm": {
     "onlyBuiltDependencies": [
-      "esbuild"
+      "esbuild",
+      "@vscode/ripgrep"
     ],
     "ignoredBuiltDependencies": [
       "tree-sitter",

@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-08T13:12:37.668Z",
+  "node_version": "v24.11.1",
+  "runs": 11,
+  "project": {
+    "files": 116,
+    "symbols": 3234,
+    "references": 66694,
+    "reference_names": 6234
+  },
+  "index": {
+    "duration_ms": 6333,
+    "scan_ms": 25,
+    "analyze_ms": 5216,
+    "write_ms": 945,
+    "graph_ms": 147,
+    "db_bytes": 7778304,
+    "files_parsed": 116
+  },
+  "questions": [
+    {
+      "name": "Where is apply_patch defined?",
+      "mcp": {
+        "median_ms": 0.81,
+        "median_bytes": 455
+      },
+      "naive": {
+        "median_ms": 25.44,
+        "median_bytes": 1954
+      },
+      "speedup": 31.38,
+      "context_saved_pct": 76.71
+    },
+    {
+      "name": "Every use of resolve_project_path",
+      "mcp": {
+        "median_ms": 0.44,
+        "median_bytes": 1681
+      },
+      "naive": {
+        "median_ms": 26.61,
+        "median_bytes": 2130
+      },
+      "speedup": 60.68,
+      "context_saved_pct": 21.08
+    },
+    {
+      "name": "Who calls scan_project?",
+      "mcp": {
+        "median_ms": 0.13,
+        "median_bytes": 90
+      },
+      "naive": {
+        "median_ms": 24.88,
+        "median_bytes": 2887
+      },
+      "speedup": 196.39,
+      "context_saved_pct": 96.88
+    },
+    {
+      "name": "What does src/edit/project_file.ts import?",
+      "mcp": {
+        "median_ms": 0.18,
+        "median_bytes": 1086
+      },
+      "naive": {
+        "median_ms": 16.28,
+        "median_bytes": 351
+      },
+      "speedup": 89.48,
+      "context_saved_pct": -209.4
+    },
+    {
+      "name": "Structure of src/mcp/server.ts",
+      "mcp": {
+        "median_ms": 0.15,
+        "median_bytes": 4963
+      },
+      "naive": {
+        "median_ms": 0.32,
+        "median_bytes": 7019
+      },
+      "speedup": 2.17,
+      "context_saved_pct": 29.29
+    },
+    {
+      "name": "Every occurrence of handle_line in code",
+      "mcp": {
+        "median_ms": 33.11,
+        "median_bytes": 2254
+      },
+      "naive": {
+        "median_ms": 24.23,
+        "median_bytes": 426
+      },
+      "speedup": 0.73,
+      "context_saved_pct": -429.11
+    },
+    {
+      "name": "Full context of the mcp_server class",
+      "mcp": {
+        "median_ms": 3.17,
+        "median_bytes": 2462
+      },
+      "naive": {
+        "median_ms": 25.82,
+        "median_bytes": 1117
+      },
+      "speedup": 8.15,
+      "context_saved_pct": -120.41
+    }
+  ],
+  "summary": {
+    "median_speedup": 31.38,
+    "mean_speedup": 55.57,
+    "context_bytes_naive": 15884,
+    "context_bytes_mcp": 12991,
+    "context_saved_pct": 18.21
+  }
+}
