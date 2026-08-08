@@ -1,8 +1,7 @@
 ﻿{
-    "outputDirectory":  "docs/.vitepress/dist",
-    "buildCommand":  "pnpm run docs:build",
-    "env":  {
-                "CI":  "true"
-            },
-    "framework":  "vitepress"
+  "buildCommand": "pnpm run docs:build",
+  "outputDirectory": "docs/.vitepress/dist",
+  "installCommand": "pnpm install",
+  "framework": "vitepress",
+  "nodeVersion": "20.x"
 }
