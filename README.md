@@ -534,7 +534,8 @@ pnpm run build
 npm publish --access public
 ```
 
-`prepublishOnly` runs the build. Only `dist/`, `README.md`, and `LICENSE` are published.
+`prepublishOnly` runs the build. CI runs typecheck, lint, tests and the build on Linux, macOS and Windows.
+The published package contains only `dist/`, `README.md`, `LICENSE`, `SECURITY.md`, and `CHANGELOG.md`.
 
 ## Roadmap
 
