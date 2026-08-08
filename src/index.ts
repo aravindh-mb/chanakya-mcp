@@ -55,6 +55,22 @@ export {
 export { hash_content } from './core/hash.js';
 
 export {
+  index_store,
+  DATABASE_FILE_NAME,
+  type index_counts,
+  type open_index_store_options,
+} from './store/index_store.js';
+export { SCHEMA_VERSION, METADATA_KEYS, TABLE_NAMES } from './store/schema.js';
+export {
+  index_project,
+  analyze_file,
+  DEFAULT_WRITE_BATCH_SIZE,
+  type index_failure,
+  type index_project_options,
+  type index_project_result,
+} from './indexer/index_project.js';
+
+export {
   build_symbol_id,
   is_symbol_kind,
   SYMBOL_KINDS,

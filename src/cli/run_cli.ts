@@ -6,13 +6,9 @@
 import { describe_unknown_error, is_code_intelligence_error } from '../core/errors.js';
 import { create_logger, type logger } from '../core/logger.js';
 import { read_package_meta } from '../core/package_meta.js';
-import { resolve_project_root } from '../core/project_root.js';
-import { extract_symbols } from '../extract/symbol_extractor.js';
-import type { symbol_kind } from '../model/symbol.js';
-import { parse_file } from '../parser/parse_file.js';
-import { scan_project } from '../scanner/file_scanner.js';
-import type { language_id } from '../scanner/language.js';
-import type { scan_result } from '../scanner/types.js';
+import { resolve_project_root, type project_root } from '../core/project_root.js';
+import { index_project } from '../indexer/index_project.js';
+import { index_store } from '../store/index_store.js';
 import { build_help_text } from './help_text.js';
 import { parse_args } from './parse_args.js';
 import { EXIT_CODE, type exit_code } from './types.js';
@@ -62,12 +58,9 @@ export async function run_cli(options: run_cli_options): Promise<exit_code> {
     logger.info(`project root: ${root.root_path}`);
     logger.debug(`data directory: ${root.data_dir_path}`);
 
-    const scan = await scan_project({ root_path: root.root_path });
-    report_scan(scan, logger);
+    await build_index(root, meta.version, logger);
 
-    await report_parse(scan, logger);
-
-    logger.info('ok - the index and MCP server are not implemented yet (phase 5 of 20)');
+    logger.info('ok - incremental indexing and the MCP server are not implemented yet (phase 6 of 20)');
 
     return EXIT_CODE.success;
   } catch (error: unknown) {
@@ -81,82 +74,41 @@ export async function run_cli(options: run_cli_options): Promise<exit_code> {
   }
 }
 
-function report_scan(scan: scan_result, log: logger): void {
-  const { stats } = scan;
-  log.info(
-    `scanned ${stats.directories_scanned} directories in ${stats.duration_ms}ms, ` +
-      `found ${stats.files_matched} source files`,
-  );
-
-  for (const [language, count] of count_by_language(scan)) {
-    log.debug(`  ${language}: ${count}`);
-  }
-
-  if (scan.skipped.length > 0) {
-    log.info(`skipped ${scan.skipped.length} entries (use --verbose to list them)`);
-    for (const entry of scan.skipped) {
-      log.debug(`  ${entry.relative_path} [${entry.reason}] ${entry.detail}`);
-    }
-  }
-}
-
 /**
- * Parse every scanned file and summarize.
+ * Build the on-disk index and report what it contains.
  *
- * Files are parsed one at a time and the result is discarded immediately: only
- * the counters survive, so memory stays flat regardless of repository size.
- * Phases 6 and 7 replace this with a persistent index.
+ * The store is closed in a `finally` block: leaving a SQLite handle open would
+ * strand the WAL files, and on Windows would keep the database locked against
+ * the next run.
  */
-async function report_parse(scan: scan_result, log: logger): Promise<void> {
-  const started_at = Date.now();
-  let parsed = 0;
-  let with_syntax_errors = 0;
-  let failed = 0;
-  let symbol_count = 0;
-  const kind_counts = new Map<symbol_kind, number>();
+async function build_index(root: project_root, tool_version: string, log: logger): Promise<void> {
+  const store = index_store.open({
+    data_dir_path: root.data_dir_path,
+    project_root: root.root_path,
+    tool_version,
+  });
 
-  for (const file of scan.files) {
-    try {
-      const result = await parse_file({ file_path: file.file_path });
-      parsed += 1;
-      if (result.has_errors) {
-        with_syntax_errors += 1;
-        log.debug(
-          `  ${file.relative_path}: ${result.parse_errors.length} syntax issue(s), ` +
-            `first at line ${result.parse_errors[0]?.range.start.line ?? 0}`,
-        );
-      }
+  try {
+    const result = await index_project({ store, root_path: root.root_path, logger: log });
+    const counts = store.count();
 
-      const extracted = extract_symbols({ parsed: result, relative_path: file.relative_path });
-      symbol_count += extracted.symbols.length;
-      for (const symbol of extracted.symbols) {
-        kind_counts.set(symbol.kind, (kind_counts.get(symbol.kind) ?? 0) + 1);
-      }
-    } catch (error: unknown) {
-      // One unparseable file must not abort the run, but it is reported.
-      failed += 1;
-      log.warn(`  ${file.relative_path}: ${describe_unknown_error(error)}`);
+    log.info(
+      `indexed ${result.files_indexed} files in ${result.duration_ms}ms: ` +
+        `${counts.symbols} symbols, ${counts.relationships} relationships`,
+    );
+    log.debug(`index written to ${root.data_dir_path}`);
+
+    if (result.files_with_syntax_errors > 0) {
+      log.info(`${result.files_with_syntax_errors} file(s) had syntax errors but were still indexed`);
     }
-  }
 
-  log.info(`parsed ${parsed} files in ${Date.now() - started_at}ms`);
-  log.info(`extracted ${symbol_count} symbols`);
-  for (const [kind, count] of [...kind_counts.entries()].sort((left, right) => right[1] - left[1])) {
-    log.debug(`  ${kind}: ${count}`);
+    if (result.files_failed > 0) {
+      log.info(`${result.files_failed} file(s) could not be indexed (use --verbose for details)`);
+      for (const failure of result.failures) {
+        log.debug(`  ${failure.relative_path}: ${failure.reason}`);
+      }
+    }
+  } finally {
+    store.close();
   }
-  if (with_syntax_errors > 0) {
-    log.info(`${with_syntax_errors} file(s) contain syntax errors (still indexable; use --verbose)`);
-  }
-  if (failed > 0) {
-    log.info(`${failed} file(s) could not be parsed at all`);
-  }
-}
-
-/** Counts per language, ordered highest first, for the startup summary. */
-function count_by_language(scan: scan_result): Array<[language_id, number]> {
-  const counts = new Map<language_id, number>();
-  for (const file of scan.files) {
-    counts.set(file.language, (counts.get(file.language) ?? 0) + 1);
-  }
-  return [...counts.entries()].sort((left, right) => right[1] - left[1]);
 }

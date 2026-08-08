@@ -55,6 +55,8 @@ interface extraction_state {
   readonly relationships: relationship[];
   /** Guards against two declarations producing the same id in one file. */
   readonly used_ids: Set<string>;
+  /** Same guard for edges; see `build_relationship_id`. */
+  readonly used_edge_ids: Set<string>;
   readonly relative_path: string;
   readonly language: language_id;
   readonly source: string;
@@ -67,6 +69,7 @@ export function extract_symbols(options: extract_symbols_options): extracted_sym
     symbols: [],
     relationships: [],
     used_ids: new Set(),
+    used_edge_ids: new Set(),
     relative_path,
     language: parsed.language,
     source: parsed.source,
@@ -155,7 +158,7 @@ function visit(
   state.symbols.push(symbol);
 
   if (context.parent_id !== undefined) {
-    state.relationships.push(create_contains_edge(context.parent_id, symbol, state.relative_path));
+    state.relationships.push(create_contains_edge(context.parent_id, symbol, state.relative_path, state));
   }
 
   visit_children(
@@ -291,37 +294,50 @@ function create_symbol(
  * The first one keeps the clean id so the common case stays readable.
  */
 function allocate_id(state: extraction_state, container_path: readonly string[], kind: symbol_kind): string {
-  const base = build_symbol_id({ file_path: state.relative_path, kind, container_path });
-  if (!state.used_ids.has(base)) {
-    state.used_ids.add(base);
-    return base;
-  }
+  return allocate_unique_id(state.used_ids, (disambiguator) =>
+    build_symbol_id({ file_path: state.relative_path, kind, container_path, disambiguator }),
+  );
+}
 
-  let disambiguator = 2;
+/**
+ * Return the first id `build` produces that is not already taken, recording it.
+ *
+ * `build` is called with `undefined` first so the clean, readable form wins
+ * whenever it is free, and only genuine repeats get a `~n` suffix.
+ */
+function allocate_unique_id(
+  used_ids: Set<string>,
+  build: (disambiguator: number | undefined) => string,
+): string {
+  let disambiguator: number | undefined;
+
   for (;;) {
-    const candidate = build_symbol_id({
-      file_path: state.relative_path,
-      kind,
-      container_path,
-      disambiguator,
-    });
-    if (!state.used_ids.has(candidate)) {
-      state.used_ids.add(candidate);
+    const candidate = build(disambiguator);
+    if (!used_ids.has(candidate)) {
+      used_ids.add(candidate);
       return candidate;
     }
-    disambiguator += 1;
+    disambiguator = disambiguator === undefined ? 2 : disambiguator + 1;
   }
 }
 
-function create_contains_edge(parent_id: string, symbol: code_symbol, relative_path: string): relationship {
+function create_contains_edge(
+  parent_id: string,
+  symbol: code_symbol,
+  relative_path: string,
+  state: extraction_state,
+): relationship {
   return {
-    id: build_relationship_id({
-      kind: 'contains',
-      from_id: parent_id,
-      to_name: symbol.name,
-      file_path: relative_path,
-      line: symbol.start_line,
-    }),
+    id: allocate_unique_id(state.used_edge_ids, (disambiguator) =>
+      build_relationship_id({
+        kind: 'contains',
+        from_id: parent_id,
+        to_name: symbol.name,
+        file_path: relative_path,
+        line: symbol.start_line,
+        disambiguator,
+      }),
+    ),
     kind: 'contains',
     from_id: parent_id,
     to_id: symbol.id,

@@ -3,9 +3,9 @@
 A local [MCP](https://modelcontextprotocol.io) server that gives AI coding agents — Claude Code, Cursor,
 and any other MCP-compatible client — deep structural knowledge of a JavaScript/TypeScript codebase.
 
-> **Status: early development.** Phases 1–5 of 20 are implemented: package foundation, CLI, project
-> scanner, tree-sitter parsing, the normalized code model, and symbol extraction. The SQLite index and
-> the MCP server are not implemented yet. See [Roadmap](#roadmap).
+> **Status: early development.** Phases 1–6 of 20 are implemented: package foundation, CLI, project
+> scanner, tree-sitter parsing, the normalized code model, symbol extraction, and the SQLite index.
+> Incremental indexing and the MCP server are not implemented yet. See [Roadmap](#roadmap).
 
 ## Why this exists
 
@@ -209,6 +209,42 @@ which is how consumers actually address it.
 Measured on 5,033 real files: 121,034 symbols and 48,532 containment edges, 0 extraction failures,
 117 files/sec, 154 MB peak heap. Throughput work is deferred to Phase 17.
 
+## The index
+
+`index_project()` walks the project and writes `<project>/.code-intelligence/index.db`. The directory is
+created with a `.gitignore` that excludes it, so the index is never committed by accident.
+
+Tables: `files`, `symbols`, `relationships`, `references`, `imports`, `exports`, `metadata`, with indexes
+on the lookup paths that matter — symbol name, name+kind, file, parent, and edges in both directions.
+
+Everything derived from a file cascades from its `files` row, so reindexing one file deletes its old
+symbols, edges, imports, exports and references and reinserts them in a single transaction. A crash
+mid-write leaves the previous state, never a half-updated file, and stale rows cannot be orphaned. Files
+are processed one at a time and written in batched transactions, since SQLite fsyncs per commit.
+
+The schema carries a version. On mismatch the index is **rebuilt rather than migrated**: it is derived
+data that can always be regenerated from source, so migration code would be a liability with no upside.
+
+A file that fails to parse is recorded and skipped, never fatal — one bad file in a 10,000-file
+repository must not cost the other 9,999.
+
+### Measured
+
+Indexing 5,064 real files (including `node_modules`, which is not the normal case):
+
+|                       |                                                 |
+| --------------------- | ----------------------------------------------- |
+| Full index            | 41 s (123 files/sec), 0 failures                |
+| Extracted             | 121,348 symbols, 48,678 relationships           |
+| Peak heap             | 57 MB — flat, files are processed one at a time |
+| Symbol lookup by name | ~0.02 ms                                        |
+| File structure read   | ~0.05 ms                                        |
+| Database size         | 147 MB                                          |
+
+The database size is the weak number. Symbol ids embed the full file path and are repeated in
+`parent_id` and across five indexes, so long paths cost a lot. Interning paths and using integer row ids
+is the obvious fix and belongs to the performance phase; it is recorded here rather than glossed over.
+
 ## MCP tools
 
 Planned tool surface — small and deliberately non-redundant:
@@ -248,6 +284,8 @@ src/
   parser/      tree-sitter integration, normalized syntax nodes
   model/       symbols, relationships, imports/exports/references
   extract/     syntax tree -> symbols and contains edges
+  store/       sqlite schema, queries, row mapping
+  indexer/     scan -> parse -> extract -> store
   index.ts     public library exports
 ```
 
@@ -336,7 +374,8 @@ npm publish --access public
 | 3     | Tree-sitter parsing       | Done   |
 | 4     | Normalized code model     | Done   |
 | 5     | Symbol extraction         | Done   |
-| 6-7   | SQLite index, incremental | Next   |
+| 6     | SQLite index              | Done   |
+| 7     | Incremental indexing      | Next   |
 | 8-10  | Search, navigation, graph | —      |
 | 11    | MCP server                | —      |
 | 12-13 | Safe + symbol-aware edits | —      |

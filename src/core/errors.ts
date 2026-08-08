@@ -16,6 +16,7 @@ export type error_code =
   | 'parser_unavailable'
   | 'source_too_large'
   | 'file_not_readable'
+  | 'index_unavailable'
   | 'internal_error';
 
 export interface error_options {

@@ -1,4 +1,4 @@
-import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -96,20 +96,29 @@ describe('run_cli', () => {
     expect(sink.stderr.join('')).toContain('does not exist');
   });
 
-  it('reports what the scanner found', async () => {
+  it('reports what was indexed', async () => {
     const sink = create_capture();
 
-    await run([], temp_dir, sink);
-
-    expect(sink.stderr.join('')).toMatch(/found \d+ source files/);
+    expect(await run([], temp_dir, sink)).toBe(EXIT_CODE.success);
+    expect(sink.stderr.join('')).toMatch(/indexed \d+ files/);
+    expect(sink.stderr.join('')).toMatch(/\d+ symbols/);
   });
 
-  it('reports what the parser found', async () => {
+  it('creates the index inside the project', async () => {
     const sink = create_capture();
 
     await run([], temp_dir, sink);
 
-    expect(sink.stderr.join('')).toMatch(/parsed \d+ files/);
+    expect(existsSync(join(temp_dir, '.code-intelligence', 'index.db'))).toBe(true);
+  });
+
+  it('releases the database handle so a second run succeeds', async () => {
+    // Windows keeps the file locked while a handle is open, so a leaked handle
+    // would make every run after the first fail.
+    const sink = create_capture();
+
+    expect(await run([], temp_dir, sink)).toBe(EXIT_CODE.success);
+    expect(await run([], temp_dir, sink)).toBe(EXIT_CODE.success);
   });
 
   it('includes the fix hint in error output', async () => {
