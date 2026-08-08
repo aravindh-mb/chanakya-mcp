@@ -3,9 +3,9 @@
 A local [MCP](https://modelcontextprotocol.io) server that gives AI coding agents — Claude Code, Cursor,
 and any other MCP-compatible client — deep structural knowledge of a JavaScript/TypeScript codebase.
 
-> **Status: early development.** Phases 1–3 of 20 are implemented: package foundation, CLI, project
-> scanner, and tree-sitter parsing. The symbol model and MCP server are not implemented yet.
-> See [Roadmap](#roadmap).
+> **Status: early development.** Phases 1–4 of 20 are implemented: package foundation, CLI, project
+> scanner, tree-sitter parsing, and the normalized code model. Symbol extraction and the MCP server
+> are not implemented yet. See [Roadmap](#roadmap).
 
 ## Why this exists
 
@@ -155,6 +155,34 @@ Measured on 4,313 real-world files (40.7 MB of source from `node_modules`): 0 ha
 files (4.8%) reported at least one syntax issue, essentially all of them `.d.ts` files using the
 constructs above.
 
+## The code model
+
+Between the grammar and the index sits a small, language-independent model. It is **not** a unified AST:
+it does not try to represent every construct in every language, only the facts an agent asks for.
+
+| Type             | What it records                                                                  |
+| ---------------- | -------------------------------------------------------------------------------- |
+| `code_file`      | path, language, size, content hash, package (for monorepos)                      |
+| `code_symbol`    | name, kind, location, parent, signature, export kind                             |
+| `relationship`   | `contains`, `imports`, `exports`, `calls`, `references`, `extends`, `implements` |
+| `code_import`    | specifier, imported/local name, resolved path, internal vs package               |
+| `code_export`    | exported name, local name, re-export source                                      |
+| `code_reference` | every occurrence of a name, with its enclosing symbol                            |
+
+Symbol kinds: `function`, `class`, `method`, `interface`, `type`, `variable`, `constant`, `enum`, `module`.
+
+Two rules shape everything here:
+
+**Never invent a relationship.** When a call target cannot be resolved, the edge is stored with the name
+that was actually written and _no_ target id, rather than pointed at a plausible-looking symbol. Edges
+carry a confidence of `certain` (derived from syntax alone) or `resolved` (followed across an import).
+There is deliberately no "guessed" level. An agent acting on a fabricated `calls` edge edits the wrong
+function, so a missing edge is much cheaper than a wrong one.
+
+**Symbol ids exclude line numbers.** An id is `<file>#<kind>:<container.path>`, for example
+`src/user.ts#method:user_service.create_user`. Editing one function therefore does not change the id of
+every symbol below it, which is what lets incremental indexing diff a file instead of rewriting it.
+
 ## MCP tools
 
 Planned tool surface — small and deliberately non-redundant:
@@ -192,6 +220,7 @@ src/
   core/        errors, logger, package metadata, project root + path containment
   scanner/     file discovery, language detection, ignore rules
   parser/      tree-sitter integration, normalized syntax nodes
+  model/       symbols, relationships, imports/exports/references
   index.ts     public library exports
 ```
 
@@ -278,7 +307,8 @@ npm publish --access public
 | 1     | Project foundation + CLI  | Done   |
 | 2     | Project scanner           | Done   |
 | 3     | Tree-sitter parsing       | Done   |
-| 4-5   | Normalized model, symbols | Next   |
+| 4     | Normalized code model     | Done   |
+| 5     | Symbol extraction         | Next   |
 | 6-7   | SQLite index, incremental | —      |
 | 8-10  | Search, navigation, graph | —      |
 | 11    | MCP server                | —      |

@@ -52,6 +52,37 @@ export {
   type skipped_entry,
 } from './scanner/types.js';
 
+export { hash_content } from './core/hash.js';
+
+export {
+  build_symbol_id,
+  is_symbol_kind,
+  SYMBOL_KINDS,
+  type code_symbol,
+  type export_kind,
+  type symbol_kind,
+  type symbol_location,
+} from './model/symbol.js';
+export {
+  build_relationship_id,
+  is_relationship_kind,
+  is_resolved,
+  RELATIONSHIP_KINDS,
+  RELATIONSHIP_CONFIDENCES,
+  type relationship,
+  type relationship_confidence,
+  type relationship_kind,
+} from './model/relationship.js';
+export {
+  is_internal_specifier,
+  type code_export,
+  type code_import,
+  type code_reference,
+  type export_kind_detail,
+  type import_kind,
+} from './model/module_graph.js';
+export { create_empty_analysis, type code_file, type file_analysis } from './model/file.js';
+
 export { parse_file, parse_source } from './parser/parse_file.js';
 export { get_grammar, get_parser, reset_parser_cache } from './parser/language_registry.js';
 export {
