@@ -4,9 +4,12 @@
  */
 
 import { describe_unknown_error, is_code_intelligence_error } from '../core/errors.js';
-import { create_logger } from '../core/logger.js';
+import { create_logger, type logger } from '../core/logger.js';
 import { read_package_meta } from '../core/package_meta.js';
 import { resolve_project_root } from '../core/project_root.js';
+import { scan_project } from '../scanner/file_scanner.js';
+import type { language_id } from '../scanner/language.js';
+import type { scan_result } from '../scanner/types.js';
 import { build_help_text } from './help_text.js';
 import { parse_args } from './parse_args.js';
 import { EXIT_CODE, type exit_code } from './types.js';
@@ -55,7 +58,11 @@ export async function run_cli(options: run_cli_options): Promise<exit_code> {
     logger.info(`${meta.name} v${meta.version}`);
     logger.info(`project root: ${root.root_path}`);
     logger.debug(`data directory: ${root.data_dir_path}`);
-    logger.info('startup ok - the MCP server is not implemented yet (phase 1 of 20)');
+
+    const scan = await scan_project({ root_path: root.root_path });
+    report_scan(scan, logger);
+
+    logger.info('scan ok - parsing and the MCP server are not implemented yet (phase 2 of 20)');
 
     return EXIT_CODE.success;
   } catch (error: unknown) {
@@ -67,4 +74,32 @@ export async function run_cli(options: run_cli_options): Promise<exit_code> {
     }
     return EXIT_CODE.runtime_error;
   }
+}
+
+function report_scan(scan: scan_result, log: logger): void {
+  const { stats } = scan;
+  log.info(
+    `scanned ${stats.directories_scanned} directories in ${stats.duration_ms}ms, ` +
+      `found ${stats.files_matched} source files`,
+  );
+
+  for (const [language, count] of count_by_language(scan)) {
+    log.debug(`  ${language}: ${count}`);
+  }
+
+  if (scan.skipped.length > 0) {
+    log.info(`skipped ${scan.skipped.length} entries (use --verbose to list them)`);
+    for (const entry of scan.skipped) {
+      log.debug(`  ${entry.relative_path} [${entry.reason}] ${entry.detail}`);
+    }
+  }
+}
+
+/** Counts per language, ordered highest first, for the startup summary. */
+function count_by_language(scan: scan_result): Array<[language_id, number]> {
+  const counts = new Map<language_id, number>();
+  for (const file of scan.files) {
+    counts.set(file.language, (counts.get(file.language) ?? 0) + 1);
+  }
+  return [...counts.entries()].sort((left, right) => right[1] - left[1]);
 }

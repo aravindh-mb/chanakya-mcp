@@ -3,8 +3,8 @@
 A local [MCP](https://modelcontextprotocol.io) server that gives AI coding agents — Claude Code, Cursor,
 and any other MCP-compatible client — deep structural knowledge of a JavaScript/TypeScript codebase.
 
-> **Status: early development.** Phase 1 of 20 is implemented: package foundation and CLI.
-> The MCP server itself is not implemented yet. See [Roadmap](#roadmap).
+> **Status: early development.** Phases 1–2 of 20 are implemented: package foundation, CLI, and the
+> project scanner. Parsing and the MCP server are not implemented yet. See [Roadmap](#roadmap).
 
 ## Why this exists
 
@@ -86,13 +86,32 @@ No credentials or API keys are involved in any configuration.
 
 ## Supported languages
 
-| Language   | Extensions                 | Status            |
-| ---------- | -------------------------- | ----------------- |
-| JavaScript | `.js` `.mjs` `.cjs` `.jsx` | Planned (Phase 3) |
-| TypeScript | `.ts` `.tsx`               | Planned (Phase 3) |
+| Language   | Extensions                  | Detected | Parsed            |
+| ---------- | --------------------------- | -------- | ----------------- |
+| JavaScript | `.js` `.mjs` `.cjs`         | Yes      | Planned (Phase 3) |
+| JSX        | `.jsx`                      | Yes      | Planned (Phase 3) |
+| TypeScript | `.ts` `.mts` `.cts` `.d.ts` | Yes      | Planned (Phase 3) |
+| TSX        | `.tsx`                      | Yes      | Planned (Phase 3) |
+
+Language is decided by file extension only. Sniffing a `.js` file to guess whether it "really" contains
+JSX would be a guess, and this package does not guess — tree-sitter's JavaScript grammar parses JSX anyway.
 
 Framework-specific intelligence (Next.js routes, NestJS modules, Express routers) is deliberately out of
 scope until the language-level system is solid.
+
+## What the scanner excludes
+
+Skipped directories by default: `node_modules`, `.git`, `dist`, `build`, `coverage`, `out`, `.next`,
+`.nuxt`, `.svelte-kit`, `.output`, `.turbo`, `.cache`, `.parcel-cache`, `.expo`, `.vercel`, `.netlify`,
+`.yarn`, `.pnpm-store`, `.code-intelligence`. Skipped file patterns: `*.min.js`, `*.bundle.js`, `*.map`.
+
+`.gitignore` is honoured, including nested `.gitignore` files scoped to their own subtree and negation
+patterns. Files over 1 MiB are skipped. Symlinks are **not** followed by default; when enabled they are
+re-validated against the project root after resolution, so a link cannot pull in files from outside.
+
+Anything skipped for a reason worth knowing about (too large, symlink, outside root, unreadable, limit
+reached) is reported rather than silently dropped. Routine exclusions are not listed individually — on a
+large repository that list would dwarf the result.
 
 ## MCP tools
 
@@ -128,9 +147,17 @@ Currently implemented:
 ```
 src/
   cli/         argv parsing, help text, CLI orchestration
-  core/        errors, logger, package metadata, project root resolution
+  core/        errors, logger, package metadata, project root + path containment
+  scanner/     file discovery, language detection, ignore rules
   index.ts     public library exports
 ```
+
+Two path conventions hold throughout, so that index keys are identical on every operating system:
+absolute **native** paths are used for filesystem access, and **POSIX** paths relative to the project root
+are used as identifiers in the index and in MCP responses.
+
+A file inside the project has exactly one canonical identity. A symlinked file is reported under its real
+path, never the link's, so an alias can neither shadow nor duplicate the real file in the index.
 
 ## Privacy
 
@@ -205,8 +232,8 @@ npm publish --access public
 | Phase | Scope                     | Status |
 | ----- | ------------------------- | ------ |
 | 1     | Project foundation + CLI  | Done   |
-| 2     | Project scanner           | Next   |
-| 3     | Tree-sitter parsing       | —      |
+| 2     | Project scanner           | Done   |
+| 3     | Tree-sitter parsing       | Next   |
 | 4-5   | Normalized model, symbols | —      |
 | 6-7   | SQLite index, incremental | —      |
 | 8-10  | Search, navigation, graph | —      |

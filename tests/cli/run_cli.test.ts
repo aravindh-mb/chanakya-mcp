@@ -96,6 +96,14 @@ describe('run_cli', () => {
     expect(sink.stderr.join('')).toContain('does not exist');
   });
 
+  it('reports what the scanner found', async () => {
+    const sink = create_capture();
+
+    await run([], temp_dir, sink);
+
+    expect(sink.stderr.join('')).toMatch(/found \d+ source files/);
+  });
+
   it('includes the fix hint in error output', async () => {
     const sink = create_capture();
 

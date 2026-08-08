@@ -1,0 +1,6 @@
+# Prettier is configured with endOfLine: "lf". Without this, Git would check out
+# CRLF on Windows and `pnpm run format:check` would fail on a fresh clone.
+* text=auto eol=lf
+
+# Generated; keep diffs collapsed in reviews.
+pnpm-lock.yaml linguist-generated=true -diff

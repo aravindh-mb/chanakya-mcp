@@ -25,6 +25,33 @@ export {
   type resolve_project_root_options,
 } from './core/project_root.js';
 
+export { is_path_inside, to_posix_path, to_relative_posix_path } from './core/paths.js';
+
+export { scan_project, walk_project } from './scanner/file_scanner.js';
+export {
+  detect_language,
+  get_extension,
+  is_supported_file,
+  SUPPORTED_EXTENSIONS,
+  type language_id,
+} from './scanner/language.js';
+export {
+  DEFAULT_IGNORED_DIRECTORIES,
+  DEFAULT_IGNORE_PATTERNS,
+  GITIGNORE_FILE_NAME,
+} from './scanner/ignore_rules.js';
+export {
+  DEFAULT_MAX_DEPTH,
+  DEFAULT_MAX_FILE_SIZE_BYTES,
+  type scan_event,
+  type scan_options,
+  type scan_result,
+  type scan_stats,
+  type scanned_file,
+  type skip_reason,
+  type skipped_entry,
+} from './scanner/types.js';
+
 export { parse_args } from './cli/parse_args.js';
 export { run_cli, BINARY_NAME, type run_cli_options } from './cli/run_cli.js';
 export { EXIT_CODE, type cli_options, type exit_code } from './cli/types.js';
