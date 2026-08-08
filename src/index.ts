@@ -83,6 +83,14 @@ export {
 } from './model/module_graph.js';
 export { create_empty_analysis, type code_file, type file_analysis } from './model/file.js';
 
+export {
+  extract_symbols,
+  type extract_symbols_options,
+  type extracted_symbols,
+} from './extract/symbol_extractor.js';
+export { build_signature, MAX_SIGNATURE_LENGTH } from './extract/signature.js';
+export { DEFAULT_EXPORT_NAME, read_declaration_name } from './extract/declaration_name.js';
+
 export { parse_file, parse_source } from './parser/parse_file.js';
 export { get_grammar, get_parser, reset_parser_cache } from './parser/language_registry.js';
 export {

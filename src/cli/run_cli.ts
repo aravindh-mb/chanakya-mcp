@@ -7,6 +7,8 @@ import { describe_unknown_error, is_code_intelligence_error } from '../core/erro
 import { create_logger, type logger } from '../core/logger.js';
 import { read_package_meta } from '../core/package_meta.js';
 import { resolve_project_root } from '../core/project_root.js';
+import { extract_symbols } from '../extract/symbol_extractor.js';
+import type { symbol_kind } from '../model/symbol.js';
 import { parse_file } from '../parser/parse_file.js';
 import { scan_project } from '../scanner/file_scanner.js';
 import type { language_id } from '../scanner/language.js';
@@ -65,7 +67,7 @@ export async function run_cli(options: run_cli_options): Promise<exit_code> {
 
     await report_parse(scan, logger);
 
-    logger.info('ok - the symbol model and MCP server are not implemented yet (phase 3 of 20)');
+    logger.info('ok - the index and MCP server are not implemented yet (phase 5 of 20)');
 
     return EXIT_CODE.success;
   } catch (error: unknown) {
@@ -110,6 +112,8 @@ async function report_parse(scan: scan_result, log: logger): Promise<void> {
   let parsed = 0;
   let with_syntax_errors = 0;
   let failed = 0;
+  let symbol_count = 0;
+  const kind_counts = new Map<symbol_kind, number>();
 
   for (const file of scan.files) {
     try {
@@ -122,6 +126,12 @@ async function report_parse(scan: scan_result, log: logger): Promise<void> {
             `first at line ${result.parse_errors[0]?.range.start.line ?? 0}`,
         );
       }
+
+      const extracted = extract_symbols({ parsed: result, relative_path: file.relative_path });
+      symbol_count += extracted.symbols.length;
+      for (const symbol of extracted.symbols) {
+        kind_counts.set(symbol.kind, (kind_counts.get(symbol.kind) ?? 0) + 1);
+      }
     } catch (error: unknown) {
       // One unparseable file must not abort the run, but it is reported.
       failed += 1;
@@ -130,6 +140,10 @@ async function report_parse(scan: scan_result, log: logger): Promise<void> {
   }
 
   log.info(`parsed ${parsed} files in ${Date.now() - started_at}ms`);
+  log.info(`extracted ${symbol_count} symbols`);
+  for (const [kind, count] of [...kind_counts.entries()].sort((left, right) => right[1] - left[1])) {
+    log.debug(`  ${kind}: ${count}`);
+  }
   if (with_syntax_errors > 0) {
     log.info(`${with_syntax_errors} file(s) contain syntax errors (still indexable; use --verbose)`);
   }

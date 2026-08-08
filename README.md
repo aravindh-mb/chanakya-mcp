@@ -3,9 +3,9 @@
 A local [MCP](https://modelcontextprotocol.io) server that gives AI coding agents — Claude Code, Cursor,
 and any other MCP-compatible client — deep structural knowledge of a JavaScript/TypeScript codebase.
 
-> **Status: early development.** Phases 1–4 of 20 are implemented: package foundation, CLI, project
-> scanner, tree-sitter parsing, and the normalized code model. Symbol extraction and the MCP server
-> are not implemented yet. See [Roadmap](#roadmap).
+> **Status: early development.** Phases 1–5 of 20 are implemented: package foundation, CLI, project
+> scanner, tree-sitter parsing, the normalized code model, and symbol extraction. The SQLite index and
+> the MCP server are not implemented yet. See [Roadmap](#roadmap).
 
 ## Why this exists
 
@@ -183,6 +183,32 @@ function, so a missing edge is much cheaper than a wrong one.
 `src/user.ts#method:user_service.create_user`. Editing one function therefore does not change the id of
 every symbol below it, which is what lets incremental indexing diff a file instead of rewriting it.
 
+## Symbol extraction
+
+Every declaration becomes a symbol with its kind, 1-based location, containment parent, export kind,
+ambient flag, and a one-line signature with the body stripped
+(`async create_user(u: user): Promise<void>`). Containment produces `contains` edges, the one
+relationship kind that is certain from syntax alone.
+
+Three judgement calls are worth stating, because they shape what you get back:
+
+**`const f = () => {}` is recorded as a function, not a constant.** It is the dominant declaration style
+in React and modern TypeScript, and someone searching for a function has to find it.
+
+**Function-local data variables are not indexed.** Names like `stack`, `index` or `base` are meaningless
+to search for and would bury real results — on this repository, excluding them took the constant count
+from 312 to 37. Functions and classes declared inside a function _are_ kept, since a named callable is
+worth looking up however it is scoped.
+
+**Nothing is named by guesswork.** A destructuring binding (`const { a, b } = obj`) binds several names
+at once, so no symbol is recorded rather than one invented name; the bindings stay visible as references.
+Class and interface _properties_ are not symbols either, because the model has no kind for them and
+inventing one would be a deviation. `export default function () {}` is recorded under the name `default`,
+which is how consumers actually address it.
+
+Measured on 5,033 real files: 121,034 symbols and 48,532 containment edges, 0 extraction failures,
+117 files/sec, 154 MB peak heap. Throughput work is deferred to Phase 17.
+
 ## MCP tools
 
 Planned tool surface — small and deliberately non-redundant:
@@ -221,6 +247,7 @@ src/
   scanner/     file discovery, language detection, ignore rules
   parser/      tree-sitter integration, normalized syntax nodes
   model/       symbols, relationships, imports/exports/references
+  extract/     syntax tree -> symbols and contains edges
   index.ts     public library exports
 ```
 
@@ -308,8 +335,8 @@ npm publish --access public
 | 2     | Project scanner           | Done   |
 | 3     | Tree-sitter parsing       | Done   |
 | 4     | Normalized code model     | Done   |
-| 5     | Symbol extraction         | Next   |
-| 6-7   | SQLite index, incremental | —      |
+| 5     | Symbol extraction         | Done   |
+| 6-7   | SQLite index, incremental | Next   |
 | 8-10  | Search, navigation, graph | —      |
 | 11    | MCP server                | —      |
 | 12-13 | Safe + symbol-aware edits | —      |
