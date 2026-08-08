@@ -18,6 +18,7 @@ export type error_code =
   | 'file_not_readable'
   | 'index_unavailable'
   | 'watch_unavailable'
+  | 'unsafe_pattern'
   | 'internal_error';
 
 export interface error_options {

@@ -3,10 +3,10 @@
 A local [MCP](https://modelcontextprotocol.io) server that gives AI coding agents — Claude Code, Cursor,
 and any other MCP-compatible client — deep structural knowledge of a JavaScript/TypeScript codebase.
 
-> **Status: early development.** Phases 1–7 of 20 are implemented: package foundation, CLI, project
-> scanner, tree-sitter parsing, the normalized code model, symbol extraction, the SQLite index, and
-> incremental indexing with a file watcher. Search and the MCP server are not implemented yet.
-> See [Roadmap](#roadmap).
+> **Status: early development.** Phases 1–8 of 20 are implemented: package foundation, CLI, project
+> scanner, tree-sitter parsing, the normalized code model, symbol extraction, the SQLite index,
+> incremental indexing with a file watcher, and lexical search. Navigation and the MCP server are not
+> implemented yet. See [Roadmap](#roadmap).
 
 ## Why this exists
 
@@ -297,6 +297,54 @@ Watching uses `fs.watch` in recursive mode rather than adding a dependency. That
 recursive mode is unavailable on some platform and Node combinations, and where it is, the failure is
 reported clearly at startup rather than silently watching nothing.
 
+## Search
+
+Two entry points, both returning locations and signatures — never file contents.
+
+**`search_symbols`** matches symbol names. It runs exact, prefix and substring comparisons as separate
+queries in that order, rather than one combined query: `name = ?` and `name LIKE 'q%'` can use the name
+index while `LIKE '%q%'` cannot, so the cheap comparisons run first and an exact hit never pays for a
+full scan. That ordering is also the ranking. Filters: kind, language, path, exported-only, and
+exclude-ambient (to drop `.d.ts` noise).
+
+**`search_code`** searches file contents, reading from disk rather than storing source — the index would
+double in size for data already on the filesystem, and go stale the moment a file changed. What the
+index _does_ supply is the file list, already filtered by ignore rules, `.gitignore` and size limits, so
+a search never wanders into `node_modules` or a minified bundle.
+
+Every code match is annotated with **the symbol whose body encloses it**, innermost first. That is the
+part a plain grep cannot give you, and it is often enough to decide without opening the file:
+
+```
+src/search/pattern.ts:104  in method find
+   // Long lines are the amplifier for catastrophic backtracking, and are
+```
+
+Measured on this repository (69 files, 403 symbols): 0.32 ms per symbol search, 6 ms for a full-text
+search across every indexed file.
+
+### Regex safety
+
+Regex search is supported, and the limits are worth stating precisely rather than waving at.
+
+JavaScript's regex engine backtracks and has no timeout, so a pattern nesting one unbounded quantifier
+inside another — `(a+)+`, `(\w*)*` — takes exponential time. This was **measured, not assumed**:
+`(a+)+$` against a _30 character_ line takes 15 seconds, and every extra character roughly doubles it.
+
+That measurement rules out the obvious mitigations. A line-length cap does not help, because the blowup
+happens two orders of magnitude below any useful cap. Neither does a wall-clock budget, because the
+engine never yields during a single failing match. So such patterns are **rejected before they run**,
+with a message explaining how to rewrite them.
+
+This is a heuristic and is documented as one. It catches the nested-quantifier family, which is what
+gets written by accident. It does not catch every pathological pattern — an overlapping alternation like
+`(a|a)+` can also backtrack badly. The complete fix is to run matching in a worker thread that can be
+terminated, which is scheduled for the security phase. Until then the package assumes a cooperating
+client rather than an attacker.
+
+Separately, all SQL is parameterised and `LIKE` wildcards in user queries are escaped, so searching for
+`%` finds the literal character instead of returning the entire index.
+
 ## MCP tools
 
 Planned tool surface — small and deliberately non-redundant:
@@ -338,6 +386,7 @@ src/
   extract/     syntax tree -> symbols and contains edges
   store/       sqlite schema, queries, row mapping
   indexer/     scan -> parse -> extract -> store
+  search/      symbol and text search, regex safety
   index.ts     public library exports
 ```
 
@@ -428,7 +477,8 @@ npm publish --access public
 | 5     | Symbol extraction         | Done   |
 | 6     | SQLite index              | Done   |
 | 7     | Incremental indexing      | Done   |
-| 8-10  | Search, navigation, graph | Next   |
+| 8     | Code search               | Done   |
+| 9-10  | Navigation, graph         | Next   |
 | 11    | MCP server                | —      |
 | 12-13 | Safe + symbol-aware edits | —      |
 | 14-17 | Context, semantic, perf   | —      |

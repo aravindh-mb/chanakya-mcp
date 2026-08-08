@@ -61,6 +61,33 @@ export interface file_stamp {
   readonly indexed_at: number;
 }
 
+/**
+ * A SQL fragment plus its bound values.
+ *
+ * Values are always bound, never interpolated. Everything reaching this layer
+ * came from an MCP client, so string-built SQL would be an injection hole.
+ */
+export interface sql_condition {
+  readonly sql: string;
+  readonly parameters: readonly string[];
+}
+
+export interface symbol_query {
+  readonly name_condition: sql_condition;
+  readonly kinds?: readonly string[];
+  readonly languages?: readonly string[];
+  /** Already-escaped `LIKE` pattern for the file path. */
+  readonly path_like?: string;
+  readonly exported_only?: boolean;
+  readonly exclude_ambient?: boolean;
+  readonly limit: number;
+}
+
+export interface file_query {
+  readonly languages?: readonly string[];
+  readonly path_like?: string;
+}
+
 export interface index_counts {
   readonly files: number;
   readonly symbols: number;
@@ -224,6 +251,79 @@ export class index_store {
   find_references_by_name(name: string, limit = 100): readonly code_reference[] {
     const rows = this.#statements.select_references_by_name.all(name, limit) as reference_row[];
     return rows.map(to_code_reference);
+  }
+
+  /**
+   * Symbols whose name matches, with filters applied in SQL.
+   *
+   * The three match modes are issued as separate statements by the caller
+   * rather than combined into one `OR`, because `name = ?` and `name LIKE 'q%'`
+   * can use the name index while `LIKE '%q%'` cannot. Running them in
+   * precedence order also means exact matches are found without scanning.
+   */
+  query_symbols(options: symbol_query): readonly code_symbol[] {
+    const conditions: string[] = [];
+    const parameters: Array<string | number> = [];
+
+    conditions.push(options.name_condition.sql);
+    parameters.push(...options.name_condition.parameters);
+
+    if (options.kinds !== undefined && options.kinds.length > 0) {
+      conditions.push(`kind IN (${options.kinds.map(() => '?').join(', ')})`);
+      parameters.push(...options.kinds);
+    }
+
+    if (options.languages !== undefined && options.languages.length > 0) {
+      conditions.push(`language IN (${options.languages.map(() => '?').join(', ')})`);
+      parameters.push(...options.languages);
+    }
+
+    if (options.path_like !== undefined) {
+      conditions.push(`file_path LIKE ? ESCAPE '\\'`);
+      parameters.push(options.path_like);
+    }
+
+    if (options.exported_only === true) {
+      conditions.push(`export_kind != 'none'`);
+    }
+
+    if (options.exclude_ambient === true) {
+      conditions.push('is_ambient = 0');
+    }
+
+    parameters.push(options.limit);
+
+    const rows = this.#db
+      .prepare(
+        `SELECT * FROM symbols WHERE ${conditions.join(' AND ')}
+         ORDER BY length(name), file_path, start_line LIMIT ?`,
+      )
+      .all(...parameters) as symbol_row[];
+
+    return rows.map(to_code_symbol);
+  }
+
+  /** Indexed files, optionally narrowed by language or path. */
+  list_files(options: file_query = {}): readonly code_file[] {
+    const conditions: string[] = [];
+    const parameters: Array<string | number> = [];
+
+    if (options.languages !== undefined && options.languages.length > 0) {
+      conditions.push(`language IN (${options.languages.map(() => '?').join(', ')})`);
+      parameters.push(...options.languages);
+    }
+
+    if (options.path_like !== undefined) {
+      conditions.push(`file_path LIKE ? ESCAPE '\\'`);
+      parameters.push(options.path_like);
+    }
+
+    const where = conditions.length === 0 ? '' : `WHERE ${conditions.join(' AND ')}`;
+    const rows = this.#db
+      .prepare(`SELECT * FROM files ${where} ORDER BY file_path`)
+      .all(...parameters) as file_row[];
+
+    return rows.map(to_code_file);
   }
 
   count(): index_counts {

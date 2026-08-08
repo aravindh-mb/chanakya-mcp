@@ -135,6 +135,24 @@ export {
   type syntax_node,
 } from './parser/types.js';
 
+export { search_symbols } from './search/search_symbols.js';
+export { search_code, DEFAULT_TIME_BUDGET_MS } from './search/search_code.js';
+export { build_line_matcher, escape_like, MAX_LINE_LENGTH, MAX_PATTERN_LENGTH } from './search/pattern.js';
+export { assert_regex_is_safe, has_nested_quantifier } from './search/regex_safety.js';
+export {
+  DEFAULT_CODE_LIMIT,
+  DEFAULT_MATCHES_PER_FILE,
+  DEFAULT_SYMBOL_LIMIT,
+  type code_match,
+  type enclosing_symbol,
+  type match_mode,
+  type search_code_options,
+  type search_code_result,
+  type search_symbols_options,
+  type search_symbols_result,
+  type symbol_hit,
+} from './search/types.js';
+
 export { parse_args } from './cli/parse_args.js';
 export { run_cli, BINARY_NAME, type run_cli_options } from './cli/run_cli.js';
 export { EXIT_CODE, type cli_options, type exit_code } from './cli/types.js';
