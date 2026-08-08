@@ -14,10 +14,7 @@
 import type { parsed_file, syntax_node } from '../parser/types.js';
 import { is_internal_specifier, type code_import, type import_kind } from '../model/module_graph.js';
 import { unquote } from './string_literal.js';
-import {
-  resolve_module_specifier,
-  type file_index,
-} from './module_resolution.js';
+import { resolve_module_specifier, type file_index } from './module_resolution.js';
 
 /** The `import` keyword inside `import('m')` — not a callable identifier. */
 const DYNAMIC_IMPORT = 'import';
@@ -38,13 +35,12 @@ export function extract_imports(options: extract_imports_options): readonly code
   const files = options.files ?? new Set<string>();
 
   const imports: code_import[] = [];
-  const used_ids = new Set<string>();
 
   for (const node of parsed.root.walk()) {
     if (node.type === 'import_statement') {
-      read_static_import(node, relative_path, files, imports, used_ids);
+      read_static_import(node, relative_path, files, imports);
     } else if (node.type === 'call_expression') {
-      read_dynamic_import(node, relative_path, files, imports, used_ids);
+      read_dynamic_import(node, relative_path, files, imports);
     }
   }
 
@@ -56,7 +52,6 @@ function read_static_import(
   relative_path: string,
   files: file_index,
   imports: code_import[],
-  used_ids: Set<string>,
 ): void {
   const source = node.child_by_field('source');
   if (source === undefined) {
@@ -81,20 +76,12 @@ function read_static_import(
   };
 
   const import_clause =
-    node.child_by_field('import_clause') ?? node.named_children.find((child) => child.type === 'import_clause');
+    node.child_by_field('import_clause') ??
+    node.named_children.find((child) => child.type === 'import_clause');
 
   if (import_clause === undefined) {
     // `import 'm';` — a side effect, no binding at all.
-    imports.push(
-      build_import(
-        common,
-        'side_effect',
-        undefined,
-        undefined,
-        node,
-        used_ids,
-      ),
-    );
+    imports.push(build_import(common, 'side_effect', undefined, undefined));
     return;
   }
 
@@ -110,29 +97,20 @@ function read_static_import(
           if (imported === undefined) {
             continue;
           }
-          imports.push(
-            build_import(
-              common,
-              'named',
-              imported.text,
-              alias?.text ?? imported.text,
-              specifier_node,
-              used_ids,
-            ),
-          );
+          imports.push(build_import(common, 'named', imported.text, alias?.text ?? imported.text));
         }
         break;
       }
       case 'namespace_import': {
         const name = child.child_by_field('name') ?? child.named_children[0];
         if (name !== undefined) {
-          imports.push(build_import(common, 'namespace', undefined, name.text, name, used_ids));
+          imports.push(build_import(common, 'namespace', undefined, name.text));
         }
         break;
       }
       case 'identifier': {
         // The default binding: `import a from 'm'`.
-        imports.push(build_import(common, 'default', 'default', child.text, child, used_ids));
+        imports.push(build_import(common, 'default', 'default', child.text));
         break;
       }
       default:
@@ -146,7 +124,6 @@ function read_dynamic_import(
   relative_path: string,
   files: file_index,
   imports: code_import[],
-  used_ids: Set<string>,
 ): void {
   const callee = node.child_by_field('function');
   if (callee === undefined) {
@@ -172,8 +149,6 @@ function read_dynamic_import(
           'dynamic',
           undefined,
           undefined,
-          node,
-          used_ids,
         ),
       );
     }
@@ -200,8 +175,6 @@ function read_dynamic_import(
           'require',
           undefined,
           read_require_binding(node),
-          node,
-          used_ids,
         ),
       );
     }
@@ -252,23 +225,8 @@ function build_import(
   kind: import_kind,
   imported_name: string | undefined,
   local_name: string | undefined,
-  anchor: syntax_node,
-  used_ids: Set<string>,
 ): code_import {
-  const base_id = `${base.file_path}#import:${imported_name ?? local_name ?? base.module_specifier}@${
-    anchor.range.start.line
-  }:${anchor.range.start.column}`;
-
-  let id = base_id;
-  let disambiguator = 2;
-  while (used_ids.has(id)) {
-    id = `${base_id}~${disambiguator}`;
-    disambiguator += 1;
-  }
-  used_ids.add(id);
-
   return {
-    id,
     file_path: base.file_path,
     kind,
     module_specifier: base.module_specifier,

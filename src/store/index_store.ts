@@ -122,6 +122,7 @@ interface prepared_statements {
   readonly select_references_by_name: Statement;
   readonly select_references_to: Statement;
   readonly select_unresolved_references: Statement;
+  readonly select_symbol_key: Statement;
   readonly update_edge_target: Statement;
   readonly update_import_resolved_path: Statement;
   readonly update_reference_target: Statement;
@@ -159,22 +160,27 @@ export class index_store {
   write_file_analysis(analysis: file_analysis): void {
     this.transaction(() => {
       this.#statements.delete_file.run(analysis.file.file_path);
-      this.#insert_file(analysis.file);
+      const file_id = this.#insert_file(analysis.file);
 
+      const symbol_key_by_id = new Map<string, number>();
       for (const symbol of analysis.symbols) {
-        this.#insert_symbol(symbol);
+        symbol_key_by_id.set(symbol.id, this.#insert_symbol(symbol, file_id));
       }
+
+      const resolve_key = (id: string | undefined): number | null =>
+        id === undefined ? null : (symbol_key_by_id.get(id) ?? this.#live_symbol_key(id));
+
       for (const edge of analysis.relationships) {
-        this.#insert_relationship(edge);
+        this.#insert_relationship(edge, file_id, resolve_key);
       }
       for (const item of analysis.imports) {
-        this.#insert_import(item);
+        this.#insert_import(item, file_id);
       }
       for (const item of analysis.exports) {
-        this.#insert_export(item);
+        this.#insert_export(item, file_id, resolve_key);
       }
       for (const item of analysis.references) {
-        this.#insert_reference(item);
+        this.#insert_reference(item, file_id, resolve_key);
       }
     });
   }
@@ -285,7 +291,10 @@ export class index_store {
     }
     const placeholders = ids.map(() => '?').join(', ');
     const rows = this.#db
-      .prepare(`SELECT * FROM symbols WHERE id IN (${placeholders})`)
+      .prepare(
+        `SELECT s.*, f.file_path FROM symbols s JOIN files f ON f.file_id = s.file_id
+         WHERE s.id IN (${placeholders})`,
+      )
       .all(...ids) as symbol_row[];
     return rows.map(to_code_symbol);
   }
@@ -298,17 +307,17 @@ export class index_store {
 
   /** Point an unresolved edge at its resolved target, upgrading confidence. */
   set_edge_target(edge_id: string, to_id: string): void {
-    this.#statements.update_edge_target.run(to_id, edge_id);
+    this.#statements.update_edge_target.run(to_id, Number(edge_id));
   }
 
   /** Record where an import's specifier resolved to. */
   set_import_resolved_path(import_id: string, resolved_path: string): void {
-    this.#statements.update_import_resolved_path.run(resolved_path, import_id);
+    this.#statements.update_import_resolved_path.run(resolved_path, Number(import_id));
   }
 
   /** Point an unresolved reference at the symbol it turned out to name. */
   set_reference_target(reference_id: string, symbol_id: string): void {
-    this.#statements.update_reference_target.run(symbol_id, reference_id);
+    this.#statements.update_reference_target.run(symbol_id, Number(reference_id));
   }
 
   /** Every occurrence pointing at a symbol, definition first. */
@@ -371,12 +380,12 @@ export class index_store {
     }
 
     if (options.languages !== undefined && options.languages.length > 0) {
-      conditions.push(`language IN (${options.languages.map(() => '?').join(', ')})`);
+      conditions.push(`s.language IN (${options.languages.map(() => '?').join(', ')})`);
       parameters.push(...options.languages);
     }
 
     if (options.path_like !== undefined) {
-      conditions.push(`file_path LIKE ? ESCAPE '\\'`);
+      conditions.push(`f.file_path LIKE ? ESCAPE '\\'`);
       parameters.push(options.path_like);
     }
 
@@ -392,8 +401,10 @@ export class index_store {
 
     const rows = this.#db
       .prepare(
-        `SELECT * FROM symbols WHERE ${conditions.join(' AND ')}
-         ORDER BY length(name), file_path, start_line LIMIT ?`,
+        `SELECT s.*, f.file_path FROM symbols s
+         JOIN files f ON f.file_id = s.file_id
+         WHERE ${conditions.join(' AND ')}
+         ORDER BY length(s.name), f.file_path, s.start_line LIMIT ?`,
       )
       .all(...parameters) as symbol_row[];
 
@@ -462,8 +473,8 @@ export class index_store {
     return row.total;
   }
 
-  #insert_file(file: code_file): void {
-    this.#statements.insert_file.run(
+  #insert_file(file: code_file): number {
+    const row = this.#statements.insert_file.get(
       file.file_path,
       file.absolute_path,
       file.language,
@@ -474,15 +485,16 @@ export class index_store {
       to_sql_nullable(file.package_path),
       to_sql_nullable(file.package_name),
       Date.now(),
-    );
+    ) as { file_id: number };
+    return row.file_id;
   }
 
-  #insert_symbol(symbol: code_symbol): void {
-    this.#statements.insert_symbol.run(
+  #insert_symbol(symbol: code_symbol, file_id: number): number {
+    const row = this.#statements.insert_symbol.get(
       symbol.id,
       symbol.name,
       symbol.kind,
-      symbol.file_path,
+      file_id,
       symbol.language,
       symbol.start_line,
       symbol.end_line,
@@ -492,26 +504,30 @@ export class index_store {
       to_sql_nullable(symbol.signature),
       symbol.export_kind,
       to_sql_boolean(symbol.is_ambient),
-    );
+    ) as { key: number };
+    return row.key;
   }
 
-  #insert_relationship(edge: relationship): void {
+  #insert_relationship(
+    edge: relationship,
+    file_id: number,
+    resolve_key: (id: string | undefined) => number | null,
+  ): void {
+    const from_key = edge.from_id.indexOf('#') === -1 ? null : resolve_key(edge.from_id);
     this.#statements.insert_relationship.run(
-      edge.id,
       edge.kind,
-      edge.from_id,
-      to_sql_nullable(edge.to_id),
+      from_key,
+      resolve_key(edge.to_id),
       edge.to_name,
       edge.confidence,
-      edge.file_path,
+      file_id,
       edge.line,
     );
   }
 
-  #insert_import(item: code_import): void {
+  #insert_import(item: code_import, file_id: number): void {
     this.#statements.insert_import.run(
-      item.id,
-      item.file_path,
+      file_id,
       item.kind,
       item.module_specifier,
       to_sql_nullable(item.imported_name),
@@ -522,30 +538,42 @@ export class index_store {
     );
   }
 
-  #insert_export(item: code_export): void {
+  #insert_export(
+    item: code_export,
+    file_id: number,
+    resolve_key: (id: string | undefined) => number | null,
+  ): void {
     this.#statements.insert_export.run(
-      item.id,
-      item.file_path,
+      file_id,
       item.kind,
       item.exported_name,
       to_sql_nullable(item.local_name),
-      to_sql_nullable(item.symbol_id),
+      resolve_key(item.symbol_id),
       to_sql_nullable(item.module_specifier),
       item.line,
     );
   }
 
-  #insert_reference(item: code_reference): void {
+  #insert_reference(
+    item: code_reference,
+    file_id: number,
+    resolve_key: (id: string | undefined) => number | null,
+  ): void {
     this.#statements.insert_reference.run(
-      item.id,
-      item.file_path,
+      file_id,
       item.name,
-      to_sql_nullable(item.symbol_id),
-      to_sql_nullable(item.enclosing_symbol_id),
+      resolve_key(item.symbol_id),
+      resolve_key(item.enclosing_symbol_id),
       item.line,
       item.column,
       to_sql_boolean(item.is_definition),
     );
+  }
+
+  /** The current key for a live symbol, or null when it is not indexed. */
+  #live_symbol_key(id: string): number | null {
+    const row = this.#statements.select_symbol_key.get(id) as { key: number } | undefined;
+    return row?.key ?? null;
   }
 }
 
@@ -647,71 +675,120 @@ function ensure_data_directory(data_dir_path: string): void {
 }
 
 function prepare_statements(db: database_handle): prepared_statements {
+  // Every row of a non-`files` table carries `file_path` only through this
+  // join; the tables themselves store the integer `file_id`.
+  const symbols_select = 'SELECT s.*, f.file_path FROM symbols s JOIN files f ON f.file_id = s.file_id';
+
+  // `from_id` is the enclosing symbol's id, or the file path for file-level
+  // edges; `to_id` is the target symbol's id, or NULL while unresolved.
+  const relationships_select = `
+    SELECT r.key, r.kind, r.to_name, r.confidence, r.line, f.file_path,
+           CASE WHEN r.from_key IS NULL OR fs.id IS NULL THEN f.file_path ELSE fs.id END AS from_id,
+           ts.id AS to_id
+    FROM relationships r
+    JOIN files f ON f.file_id = r.file_id
+    LEFT JOIN symbols fs ON fs.key = r.from_key
+    LEFT JOIN symbols ts ON ts.key = r.to_key`;
+
+  const references_select = `
+    SELECT r.key, r.name, r.line, r.column, r.is_definition, f.file_path,
+           s.id AS symbol_id,
+           es.id AS enclosing_symbol_id
+    FROM ${REFERENCES_TABLE} r
+    JOIN files f ON f.file_id = r.file_id
+    LEFT JOIN symbols s ON s.key = r.symbol_key
+    LEFT JOIN symbols es ON es.key = r.enclosing_symbol_key`;
+
+  const imports_select = `
+    SELECT i.key, i.kind, i.module_specifier, i.imported_name, i.local_name,
+           i.resolved_path, i.is_internal, i.line, f.file_path
+    FROM imports i
+    JOIN files f ON f.file_id = i.file_id`;
+
+  const exports_select = `
+    SELECT e.key, e.kind, e.exported_name, e.local_name, e.module_specifier, e.line,
+           f.file_path, s.id AS symbol_id
+    FROM exports e
+    JOIN files f ON f.file_id = e.file_id
+    LEFT JOIN symbols s ON s.key = e.symbol_key`;
+
   return {
     insert_file: db.prepare(
       `INSERT INTO files (file_path, absolute_path, language, size, modified_time, content_hash,
                           parse_error_count, package_path, package_name, indexed_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       RETURNING file_id`,
     ),
     insert_symbol: db.prepare(
-      `INSERT INTO symbols (id, name, kind, file_path, language, start_line, end_line,
+      `INSERT INTO symbols (id, name, kind, file_id, language, start_line, end_line,
                             start_column, end_column, parent_id, signature, export_kind, is_ambient)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       RETURNING key`,
     ),
     insert_relationship: db.prepare(
-      `INSERT INTO relationships (id, kind, from_id, to_id, to_name, confidence, file_path, line)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO relationships (kind, from_key, to_key, to_name, confidence, file_id, line)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
     ),
     insert_reference: db.prepare(
-      `INSERT INTO ${REFERENCES_TABLE} (id, file_path, name, symbol_id, enclosing_symbol_id,
+      `INSERT INTO ${REFERENCES_TABLE} (file_id, name, symbol_key, enclosing_symbol_key,
                                         line, column, is_definition)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
     ),
     insert_import: db.prepare(
-      `INSERT INTO imports (id, file_path, kind, module_specifier, imported_name, local_name,
+      `INSERT INTO imports (file_id, kind, module_specifier, imported_name, local_name,
                             resolved_path, is_internal, line)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     ),
     insert_export: db.prepare(
-      `INSERT INTO exports (id, file_path, kind, exported_name, local_name, symbol_id,
+      `INSERT INTO exports (file_id, kind, exported_name, local_name, symbol_key,
                             module_specifier, line)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
     ),
     delete_file: db.prepare('DELETE FROM files WHERE file_path = ?'),
     select_file: db.prepare('SELECT * FROM files WHERE file_path = ?'),
-    select_symbol: db.prepare('SELECT * FROM symbols WHERE id = ?'),
+    select_symbol: db.prepare(`${symbols_select} WHERE s.id = ?`),
     select_symbols_by_name: db.prepare(
-      'SELECT * FROM symbols WHERE name = ? ORDER BY file_path, start_line LIMIT ?',
+      `${symbols_select} WHERE s.name = ? ORDER BY f.file_path, s.start_line LIMIT ?`,
     ),
-    select_symbols_by_file: db.prepare('SELECT * FROM symbols WHERE file_path = ? ORDER BY start_line'),
-    select_relationships_from: db.prepare('SELECT * FROM relationships WHERE from_id = ?'),
-    select_relationships_to: db.prepare('SELECT * FROM relationships WHERE to_id = ?'),
+    select_symbols_by_file: db.prepare(`${symbols_select} WHERE f.file_path = ? ORDER BY s.start_line`),
+    select_relationships_from: db.prepare(
+      `${relationships_select} WHERE r.from_key = (SELECT key FROM symbols WHERE id = ?)`,
+    ),
+    select_relationships_to: db.prepare(
+      `${relationships_select} WHERE r.to_key = (SELECT key FROM symbols WHERE id = ?)`,
+    ),
     select_unresolved_calls: db.prepare(
-      "SELECT * FROM relationships WHERE kind = 'calls' AND to_id IS NULL",
+      `${relationships_select} WHERE r.kind = 'calls' AND r.to_key IS NULL`,
     ),
-    select_all_imports: db.prepare('SELECT * FROM imports'),
-    select_all_exports: db.prepare('SELECT * FROM exports'),
-    select_symbols_by_parent: db.prepare('SELECT * FROM symbols WHERE parent_id = ? ORDER BY start_line'),
+    select_all_imports: db.prepare(`${imports_select}`),
+    select_all_exports: db.prepare(`${exports_select}`),
+    select_symbols_by_parent: db.prepare(`${symbols_select} WHERE s.parent_id = ? ORDER BY s.start_line`),
     select_file_paths: db.prepare('SELECT file_path FROM files ORDER BY file_path'),
-    select_imports_by_file: db.prepare('SELECT * FROM imports WHERE file_path = ? ORDER BY line'),
+    select_imports_by_file: db.prepare(`${imports_select} WHERE f.file_path = ? ORDER BY i.line`),
     select_imports_resolved_to: db.prepare(
-      'SELECT * FROM imports WHERE resolved_path = ? ORDER BY file_path, line',
+      `${imports_select} WHERE i.resolved_path = ? ORDER BY f.file_path, i.line`,
     ),
-    select_exports_by_file: db.prepare('SELECT * FROM exports WHERE file_path = ? ORDER BY line'),
+    select_exports_by_file: db.prepare(`${exports_select} WHERE f.file_path = ? ORDER BY e.line`),
     select_references_by_name: db.prepare(
-      `SELECT * FROM ${REFERENCES_TABLE} WHERE name = ? ORDER BY file_path, line LIMIT ?`,
+      `${references_select} WHERE r.name = ? ORDER BY f.file_path, r.line LIMIT ?`,
     ),
     select_references_to: db.prepare(
-      `SELECT * FROM ${REFERENCES_TABLE} WHERE symbol_id = ? ORDER BY is_definition DESC, file_path, line, column`,
+      `${references_select} WHERE r.symbol_key = (SELECT key FROM symbols WHERE id = ?)
+       ORDER BY r.is_definition DESC, f.file_path, r.line, r.column`,
     ),
     select_unresolved_references: db.prepare(
-      `SELECT * FROM ${REFERENCES_TABLE} WHERE symbol_id IS NULL AND is_definition = 0`,
+      `${references_select} WHERE r.symbol_key IS NULL AND r.is_definition = 0`,
     ),
+    select_symbol_key: db.prepare('SELECT key FROM symbols WHERE id = ?'),
     update_edge_target: db.prepare(
-      "UPDATE relationships SET to_id = ?, confidence = 'resolved' WHERE id = ?",
+      `UPDATE relationships SET to_key = (SELECT key FROM symbols WHERE id = ?),
+                                confidence = 'resolved'
+       WHERE key = ?`,
     ),
-    update_import_resolved_path: db.prepare('UPDATE imports SET resolved_path = ? WHERE id = ?'),
-    update_reference_target: db.prepare(`UPDATE ${REFERENCES_TABLE} SET symbol_id = ? WHERE id = ?`),
+    update_import_resolved_path: db.prepare('UPDATE imports SET resolved_path = ? WHERE key = ?'),
+    update_reference_target: db.prepare(
+      `UPDATE ${REFERENCES_TABLE} SET symbol_key = (SELECT key FROM symbols WHERE id = ?) WHERE key = ?`,
+    ),
     set_metadata: db.prepare('INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)'),
     get_metadata: db.prepare('SELECT value FROM metadata WHERE key = ?'),
   };

@@ -9,18 +9,13 @@ function extract(
   files?: ReadonlySet<string>,
 ): readonly code_import[] {
   const parsed = parse_source({ source, file_path: relative_path });
-  return extract_imports(
-    files === undefined ? { parsed, relative_path } : { parsed, relative_path, files },
-  );
+  return extract_imports(files === undefined ? { parsed, relative_path } : { parsed, relative_path, files });
 }
 
-function summarize(imports: readonly code_import[]): Array<[import_kind, string | undefined, string | undefined, string]> {
-  return imports.map((item) => [
-    item.kind,
-    item.imported_name,
-    item.local_name,
-    item.module_specifier,
-  ]);
+function summarize(
+  imports: readonly code_import[],
+): Array<[import_kind, string | undefined, string | undefined, string]> {
+  return imports.map((item) => [item.kind, item.imported_name, item.local_name, item.module_specifier]);
 }
 
 describe('extract_imports: static forms', () => {
@@ -44,9 +39,7 @@ describe('extract_imports: static forms', () => {
   });
 
   it('extracts a default import', () => {
-    expect(summarize(extract("import app from './app';"))).toEqual([
-      ['default', 'default', 'app', './app'],
-    ]);
+    expect(summarize(extract("import app from './app';"))).toEqual([['default', 'default', 'app', './app']]);
   });
 
   it('extracts a namespace import', () => {

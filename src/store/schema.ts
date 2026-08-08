@@ -15,8 +15,18 @@
  * from scratch rather than migrated: it is a derived cache that can always be
  * regenerated from source, so carrying migration code would be cost with no
  * benefit.
+ *
+ * v2 interned the long strings that made v1 huge. File paths stay readable as
+ * the public keys the MCP surface passes around, but every other table stores
+ * `file_id` (a row in `files`) and symbol `key`/`_key` integers instead of
+ * repeating the strings, and the internal `id` columns of relationships,
+ * references, imports and exports have become integer rowids.
+ *
+ * v3 drops the `symbol_ids` dictionary that v2 introduced but never read: the
+ * symbol `key` comes straight from `symbols.key`, and cross-file edges resolve
+ * their targets by symbol id at write time.
  */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 3;
 
 /** Quoted because `references` is a reserved word. */
 export const REFERENCES_TABLE = '"references"';
@@ -52,7 +62,8 @@ CREATE TABLE IF NOT EXISTS metadata (
 );
 
 CREATE TABLE IF NOT EXISTS files (
-  file_path         TEXT PRIMARY KEY,
+  file_id           INTEGER PRIMARY KEY,
+  file_path         TEXT NOT NULL UNIQUE,
   absolute_path     TEXT NOT NULL,
   language          TEXT NOT NULL,
   size              INTEGER NOT NULL,
@@ -65,46 +76,47 @@ CREATE TABLE IF NOT EXISTS files (
 );
 
 CREATE TABLE IF NOT EXISTS symbols (
-  id           TEXT PRIMARY KEY,
-  name         TEXT NOT NULL,
-  kind         TEXT NOT NULL,
-  file_path    TEXT NOT NULL REFERENCES files(file_path) ON DELETE CASCADE,
-  language     TEXT NOT NULL,
-  start_line   INTEGER NOT NULL,
-  end_line     INTEGER NOT NULL,
-  start_column INTEGER NOT NULL,
-  end_column   INTEGER NOT NULL,
-  parent_id    TEXT,
-  signature    TEXT,
-  export_kind  TEXT NOT NULL,
-  is_ambient   INTEGER NOT NULL
+  key           INTEGER PRIMARY KEY,
+  id            TEXT NOT NULL UNIQUE,
+  name          TEXT NOT NULL,
+  kind          TEXT NOT NULL,
+  file_id       INTEGER NOT NULL REFERENCES files(file_id) ON DELETE CASCADE,
+  language      TEXT NOT NULL,
+  start_line    INTEGER NOT NULL,
+  end_line      INTEGER NOT NULL,
+  start_column  INTEGER NOT NULL,
+  end_column    INTEGER NOT NULL,
+  parent_id     TEXT,
+  signature     TEXT,
+  export_kind   TEXT NOT NULL,
+  is_ambient    INTEGER NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS relationships (
-  id         TEXT PRIMARY KEY,
+  key        INTEGER PRIMARY KEY,
   kind       TEXT NOT NULL,
-  from_id    TEXT NOT NULL,
-  to_id      TEXT,
+  from_key   INTEGER,
+  to_key     INTEGER,
   to_name    TEXT NOT NULL,
   confidence TEXT NOT NULL,
-  file_path  TEXT NOT NULL REFERENCES files(file_path) ON DELETE CASCADE,
+  file_id    INTEGER NOT NULL REFERENCES files(file_id) ON DELETE CASCADE,
   line       INTEGER NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS "references" (
-  id                  TEXT PRIMARY KEY,
-  file_path           TEXT NOT NULL REFERENCES files(file_path) ON DELETE CASCADE,
-  name                TEXT NOT NULL,
-  symbol_id           TEXT,
-  enclosing_symbol_id TEXT,
-  line                INTEGER NOT NULL,
-  column              INTEGER NOT NULL,
-  is_definition       INTEGER NOT NULL
+  key                    INTEGER PRIMARY KEY,
+  file_id                INTEGER NOT NULL REFERENCES files(file_id) ON DELETE CASCADE,
+  name                   TEXT NOT NULL,
+  symbol_key             INTEGER,
+  enclosing_symbol_key   INTEGER,
+  line                   INTEGER NOT NULL,
+  column                 INTEGER NOT NULL,
+  is_definition          INTEGER NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS imports (
-  id               TEXT PRIMARY KEY,
-  file_path        TEXT NOT NULL REFERENCES files(file_path) ON DELETE CASCADE,
+  key              INTEGER PRIMARY KEY,
+  file_id          INTEGER NOT NULL REFERENCES files(file_id) ON DELETE CASCADE,
   kind             TEXT NOT NULL,
   module_specifier TEXT NOT NULL,
   imported_name    TEXT,
@@ -115,43 +127,43 @@ CREATE TABLE IF NOT EXISTS imports (
 );
 
 CREATE TABLE IF NOT EXISTS exports (
-  id               TEXT PRIMARY KEY,
-  file_path        TEXT NOT NULL REFERENCES files(file_path) ON DELETE CASCADE,
-  kind             TEXT NOT NULL,
-  exported_name    TEXT NOT NULL,
-  local_name       TEXT,
-  symbol_id        TEXT,
+  key             INTEGER PRIMARY KEY,
+  file_id         INTEGER NOT NULL REFERENCES files(file_id) ON DELETE CASCADE,
+  kind            TEXT NOT NULL,
+  exported_name   TEXT NOT NULL,
+  local_name      TEXT,
+  symbol_key      INTEGER,
   module_specifier TEXT,
-  line             INTEGER NOT NULL
+  line            INTEGER NOT NULL
 );
 
 -- Symbol lookup by name is the hot path: it backs search_symbols,
 -- find_definition and find_references.
 CREATE INDEX IF NOT EXISTS idx_symbols_name       ON symbols(name);
 CREATE INDEX IF NOT EXISTS idx_symbols_name_kind  ON symbols(name, kind);
-CREATE INDEX IF NOT EXISTS idx_symbols_file       ON symbols(file_path);
+CREATE INDEX IF NOT EXISTS idx_symbols_file       ON symbols(file_id);
 CREATE INDEX IF NOT EXISTS idx_symbols_parent     ON symbols(parent_id);
 CREATE INDEX IF NOT EXISTS idx_symbols_kind       ON symbols(kind);
 
--- Graph traversal walks edges in both directions: callers need to_id,
--- callees need from_id.
-CREATE INDEX IF NOT EXISTS idx_rel_from  ON relationships(from_id);
-CREATE INDEX IF NOT EXISTS idx_rel_to    ON relationships(to_id);
+-- Graph traversal walks edges in both directions: callers need to_key,
+-- callees need from_key.
+CREATE INDEX IF NOT EXISTS idx_rel_from  ON relationships(from_key);
+CREATE INDEX IF NOT EXISTS idx_rel_to    ON relationships(to_key);
 CREATE INDEX IF NOT EXISTS idx_rel_kind  ON relationships(kind);
 CREATE INDEX IF NOT EXISTS idx_rel_name  ON relationships(to_name);
-CREATE INDEX IF NOT EXISTS idx_rel_file  ON relationships(file_path);
+CREATE INDEX IF NOT EXISTS idx_rel_file  ON relationships(file_id);
 
 CREATE INDEX IF NOT EXISTS idx_refs_name   ON "references"(name);
-CREATE INDEX IF NOT EXISTS idx_refs_symbol ON "references"(symbol_id);
-CREATE INDEX IF NOT EXISTS idx_refs_file   ON "references"(file_path);
+CREATE INDEX IF NOT EXISTS idx_refs_symbol ON "references"(symbol_key);
+CREATE INDEX IF NOT EXISTS idx_refs_file   ON "references"(file_id);
 
-CREATE INDEX IF NOT EXISTS idx_imports_file     ON imports(file_path);
+CREATE INDEX IF NOT EXISTS idx_imports_file     ON imports(file_id);
 CREATE INDEX IF NOT EXISTS idx_imports_resolved ON imports(resolved_path);
 CREATE INDEX IF NOT EXISTS idx_imports_spec     ON imports(module_specifier);
 
-CREATE INDEX IF NOT EXISTS idx_exports_file   ON exports(file_path);
+CREATE INDEX IF NOT EXISTS idx_exports_file   ON exports(file_id);
 CREATE INDEX IF NOT EXISTS idx_exports_name   ON exports(exported_name);
-CREATE INDEX IF NOT EXISTS idx_exports_symbol ON exports(symbol_id);
+CREATE INDEX IF NOT EXISTS idx_exports_symbol ON exports(symbol_key);
 `;
 
 /** Used when the stored schema version does not match `SCHEMA_VERSION`. */
@@ -162,5 +174,6 @@ DROP TABLE IF EXISTS exports;
 DROP TABLE IF EXISTS relationships;
 DROP TABLE IF EXISTS symbols;
 DROP TABLE IF EXISTS files;
+DROP TABLE IF EXISTS symbol_ids;
 DROP TABLE IF EXISTS metadata;
 `;

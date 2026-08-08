@@ -20,7 +20,11 @@
 export type import_kind = 'named' | 'default' | 'namespace' | 'side_effect' | 'require' | 'dynamic';
 
 export interface code_import {
-  readonly id: string;
+  /**
+   * Opaque storage key. Assigned by the index on write and present on every
+   * row read back; extractors leave it absent. Not part of the public surface.
+   */
+  readonly id?: string | undefined;
   /** POSIX path of the importing file. */
   readonly file_path: string;
   readonly kind: import_kind;
@@ -49,7 +53,11 @@ export interface code_import {
 export type export_kind_detail = 'named' | 'default' | 're_export';
 
 export interface code_export {
-  readonly id: string;
+  /**
+   * Opaque storage key. Assigned by the index on write and present on every
+   * row read back; extractors leave it absent. Not part of the public surface.
+   */
+  readonly id?: string | undefined;
   readonly file_path: string;
   readonly kind: export_kind_detail;
   /** The name consumers import. `default` for default exports. */
@@ -72,7 +80,11 @@ export interface code_export {
  * resolved — recorded honestly rather than dropped or guessed.
  */
 export interface code_reference {
-  readonly id: string;
+  /**
+   * Opaque storage key. Assigned by the index on write and present on every
+   * row read back; extractors leave it absent. Not part of the public surface.
+   */
+  readonly id?: string | undefined;
   readonly file_path: string;
   /** Identifier text as written. */
   readonly name: string;

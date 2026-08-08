@@ -184,8 +184,7 @@ export function resolve_member_chain(
 
   if (first === 'this') {
     const enclosing = enclosing_id === undefined ? undefined : scope.by_id.get(enclosing_id);
-    const parent =
-      enclosing?.parent_id === undefined ? undefined : scope.by_id.get(enclosing.parent_id);
+    const parent = enclosing?.parent_id === undefined ? undefined : scope.by_id.get(enclosing.parent_id);
     if (parent === undefined || !CONTAINER_KINDS.has(parent.kind)) {
       return undefined;
     }

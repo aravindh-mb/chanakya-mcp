@@ -4,7 +4,10 @@ import { extract_symbols } from '../../src/extract/symbol_extractor.js';
 import { parse_source } from '../../src/parser/parse_file.js';
 import type { code_reference } from '../../src/model/module_graph.js';
 
-function extract(source: string, relative_path = 'src/a.ts'): {
+function extract(
+  source: string,
+  relative_path = 'src/a.ts',
+): {
   readonly refs: readonly code_reference[];
   readonly symbol_name_by_id: ReadonlyMap<string, string>;
   readonly enclosing_name_by_id: ReadonlyMap<string, string>;
@@ -24,11 +27,7 @@ function names(refs: readonly code_reference[]): string[] {
   return refs.map((ref) => ref.name);
 }
 
-function by_name(
-  refs: readonly code_reference[],
-  name: string,
-  is_definition: boolean,
-): code_reference {
+function by_name(refs: readonly code_reference[], name: string, is_definition: boolean): code_reference {
   const found = refs.find((ref) => ref.name === name && ref.is_definition === is_definition);
   if (found === undefined) {
     throw new Error(`no ${is_definition ? 'definition' : 'use'} reference named ${name}`);
@@ -59,9 +58,7 @@ describe('extract_references: definitions', () => {
 
     expect(by_name(refs, 'inner', true).symbol_id).toBeDefined();
     // The definition sits inside the inner function's own scope.
-    expect(by_name(refs, 'inner', true).enclosing_symbol_id).toBe(
-      by_name(refs, 'inner', true).symbol_id,
-    );
+    expect(by_name(refs, 'inner', true).enclosing_symbol_id).toBe(by_name(refs, 'inner', true).symbol_id);
   });
 
   it('skips parameters, which are not indexed symbols', () => {

@@ -105,7 +105,10 @@ const MAX_REFERENCE_FILES = 25;
 const MAX_MEMBERS = 50;
 const MAX_MODULE_ITEMS = 50;
 
-export function get_symbol_context(options: symbol_context_options, symbol_id: string): symbol_context_result {
+export function get_symbol_context(
+  options: symbol_context_options,
+  symbol_id: string,
+): symbol_context_result {
   const { store } = options;
 
   const symbol = store.get_symbol(symbol_id);
@@ -153,17 +156,17 @@ function parent_chain(store: index_store, symbol: code_symbol): readonly context
   return parents;
 }
 
-function members_of(store: index_store, symbol: code_symbol): { items: readonly context_symbol_ref[]; truncated: boolean } {
+function members_of(
+  store: index_store,
+  symbol: code_symbol,
+): { items: readonly context_symbol_ref[]; truncated: boolean } {
   const members = [...store.get_symbols_by_parent(symbol.id)]
     .sort((left, right) => left.start_line - right.start_line)
     .map(to_ref);
   return { items: members.slice(0, MAX_MEMBERS), truncated: members.length > MAX_MEMBERS };
 }
 
-function references_summary(
-  store: index_store,
-  symbol_id: string,
-): symbol_context_result['references'] {
+function references_summary(store: index_store, symbol_id: string): symbol_context_result['references'] {
   const references = find_references({ store }, symbol_id).references;
 
   const by_file = new Map<string, number>();
@@ -217,10 +220,7 @@ function callees_summary(store: index_store, symbol_id: string): symbol_context_
   };
 }
 
-function module_summary(
-  store: index_store,
-  file_path: string,
-): symbol_context_result['module'] {
+function module_summary(store: index_store, file_path: string): symbol_context_result['module'] {
   const dependencies = get_dependencies({ store }, file_path).dependencies;
   const internal_dependencies: string[] = [];
   const packages: string[] = [];

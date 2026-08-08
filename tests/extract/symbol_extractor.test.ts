@@ -487,28 +487,11 @@ describe('extract_symbols: unusual but valid code', () => {
     expect(ids[1]).toContain('~2');
   });
 
-  it('gives colliding contains edges distinct ids', () => {
-    // A getter/setter pair on one line produces two edges identical in kind,
-    // endpoints, file and line. Without a disambiguator these collide, which
-    // only surfaced as a UNIQUE constraint failure when indexing real code.
-    const { relationships } = extract('class c { get x() {} set x(v: number) {} }');
-    const ids = relationships.map((edge) => edge.id);
-
-    expect(ids).toHaveLength(2);
-    expect(new Set(ids).size).toBe(2);
-  });
-
-  it('gives colliding overload edges distinct ids', () => {
-    const { relationships } = extract('interface i { f(): void; f(a: string): void }');
-    const ids = relationships.map((edge) => edge.id);
-
-    expect(new Set(ids).size).toBe(ids.length);
-  });
-
-  it('keeps the clean edge id when there is no collision', () => {
+  it('leaves edge ids to the store', () => {
+    // Edge identity is the store's integer row key, minted at write time.
     const { relationships } = extract('class d { m() {} }');
 
-    expect(relationships[0]?.id).not.toContain('~');
+    expect(relationships[0]?.id).toBeUndefined();
   });
 
   it('extracts from a file with syntax errors', () => {

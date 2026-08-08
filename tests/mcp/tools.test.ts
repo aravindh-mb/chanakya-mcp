@@ -192,8 +192,6 @@ describe('mcp tools', () => {
   });
 
   it('get_symbol_context reports a tool error for a missing id', async () => {
-    await expect(call('get_symbol_context', { id: 'missing-id' })).rejects.toThrow(
-      /no symbol with id/,
-    );
+    await expect(call('get_symbol_context', { id: 'missing-id' })).rejects.toThrow(/no symbol with id/);
   });
 });

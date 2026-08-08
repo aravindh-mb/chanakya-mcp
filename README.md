@@ -521,21 +521,21 @@ npm publish --access public
 
 ## Roadmap
 
-| Phase | Scope                     | Status |
-| ----- | ------------------------- | ------ |
-| 1     | Project foundation + CLI  | Done   |
-| 2     | Project scanner           | Done   |
-| 3     | Tree-sitter parsing       | Done   |
-| 4     | Normalized code model     | Done   |
-| 5     | Symbol extraction         | Done   |
-| 6     | SQLite index              | Done   |
-| 7     | Incremental indexing      | Done   |
-| 8     | Code search               | Done   |
-| 9     | Navigation                | Done   |
-| 10    | Relationship graph        | Done   |
-| 11    | MCP server                | Done   |
-| 12-13 | Safe + symbol-aware edits | Done   |
-| 14-17 | Context, semantic, perf   | Next   |
+| Phase | Scope                     | Status                |
+| ----- | ------------------------- | --------------------- |
+| 1     | Project foundation + CLI  | Done                  |
+| 2     | Project scanner           | Done                  |
+| 3     | Tree-sitter parsing       | Done                  |
+| 4     | Normalized code model     | Done                  |
+| 5     | Symbol extraction         | Done                  |
+| 6     | SQLite index              | Done                  |
+| 7     | Incremental indexing      | Done                  |
+| 8     | Code search               | Done                  |
+| 9     | Navigation                | Done                  |
+| 10    | Relationship graph        | Done                  |
+| 11    | MCP server                | Done                  |
+| 12-13 | Safe + symbol-aware edits | Done                  |
+| 14-17 | Context, semantic, perf   | Next                  |
 | 18-20 | Security, docs, publish   | Partly (regex worker) |
 
 ## License

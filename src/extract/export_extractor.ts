@@ -51,13 +51,12 @@ export function extract_exports(options: extract_exports_options): readonly code
   const scope = build_scope_index(symbols);
 
   const exports: code_export[] = [];
-  const used_ids = new Set<string>();
 
   for (const node of parsed.root.walk()) {
     if (node.type !== 'export_statement') {
       continue;
     }
-    read_export_statement(node, relative_path, scope, exports, used_ids);
+    read_export_statement(node, relative_path, scope, exports);
   }
 
   return exports;
@@ -68,7 +67,6 @@ function read_export_statement(
   relative_path: string,
   scope: scope_index,
   exports: code_export[],
-  used_ids: Set<string>,
 ): void {
   const source =
     node.child_by_field('source') ?? node.named_children.find((child) => child.type === 'string');
@@ -76,13 +74,14 @@ function read_export_statement(
 
   // `export { a, b as c }` — with or without a `from` source.
   const export_clause =
-    node.child_by_field('export_clause') ?? node.named_children.find((child) => child.type === 'export_clause');
+    node.child_by_field('export_clause') ??
+    node.named_children.find((child) => child.type === 'export_clause');
   if (export_clause !== undefined) {
     for (const specifier of export_clause.named_children) {
       if (specifier.type !== 'export_specifier') {
         continue;
       }
-      read_export_specifier(specifier, relative_path, scope, exports, used_ids, source);
+      read_export_specifier(specifier, relative_path, scope, exports, source);
     }
     return;
   }
@@ -100,7 +99,6 @@ function read_export_statement(
           module_specifier: unquote(source.text),
         },
         source,
-        used_ids,
       ),
     );
     return;
@@ -111,7 +109,7 @@ function read_export_statement(
     node.child_by_field('declaration') ??
     node.named_children.find((child) => DECLARED_EXPORT_TYPES.has(child.type));
   if (declaration !== undefined) {
-    read_declared_export(declaration, relative_path, scope, exports, used_ids, is_default);
+    read_declared_export(declaration, relative_path, scope, exports, is_default);
     return;
   }
 
@@ -140,7 +138,6 @@ function read_export_statement(
             module_specifier: undefined,
           },
           value,
-          used_ids,
         ),
       );
     }
@@ -152,7 +149,6 @@ function read_export_specifier(
   relative_path: string,
   scope: scope_index,
   exports: code_export[],
-  used_ids: Set<string>,
   source: syntax_node | undefined,
 ): void {
   const name = specifier.child_by_field('name');
@@ -176,7 +172,6 @@ function read_export_specifier(
           module_specifier: unquote(source.text),
         },
         specifier,
-        used_ids,
       ),
     );
     return;
@@ -193,7 +188,6 @@ function read_export_specifier(
         module_specifier: undefined,
       },
       specifier,
-      used_ids,
     ),
   );
 }
@@ -203,7 +197,6 @@ function read_declared_export(
   relative_path: string,
   scope: scope_index,
   exports: code_export[],
-  used_ids: Set<string>,
   is_default: boolean,
 ): void {
   const kind: export_kind_detail = is_default ? 'default' : 'named';
@@ -227,7 +220,6 @@ function read_declared_export(
           module_specifier: undefined,
         },
         declaration,
-        used_ids,
       ),
     );
   }
@@ -264,23 +256,8 @@ interface export_base {
   readonly module_specifier: string | undefined;
 }
 
-function build_export(
-  base: export_base,
-  anchor: syntax_node,
-  used_ids: Set<string>,
-): code_export {
-  const base_id = `${base.file_path}#export:${base.exported_name}@${anchor.range.start.line}:${anchor.range.start.column}`;
-
-  let id = base_id;
-  let disambiguator = 2;
-  while (used_ids.has(id)) {
-    id = `${base_id}~${disambiguator}`;
-    disambiguator += 1;
-  }
-  used_ids.add(id);
-
+function build_export(base: export_base, anchor: syntax_node): code_export {
   return {
-    id,
     file_path: base.file_path,
     kind: base.kind,
     exported_name: base.exported_name,

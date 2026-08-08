@@ -59,7 +59,11 @@ export function is_relationship_kind(value: unknown): value is relationship_kind
 }
 
 export interface relationship {
-  readonly id: string;
+  /**
+   * Opaque storage key. Assigned by the index on write and present on every
+   * row read back; extractors leave it absent. Not part of the public surface.
+   */
+  readonly id?: string | undefined;
   readonly kind: relationship_kind;
   /** Id of the symbol the edge starts at, or a file id for file-level edges. */
   readonly from_id: string;
@@ -79,27 +83,6 @@ export interface relationship {
   readonly file_path: string;
   /** 1-based line where the edge was observed. */
   readonly line: number;
-}
-
-/**
- * Build an edge id.
- *
- * Kind, endpoints, file and line are not sufficient on their own: a getter and
- * setter pair, overloads declared on one line, or two calls to the same
- * function in one expression (`foo(foo(1))`) all produce edges identical in
- * every one of those fields. `disambiguator` separates them, and is appended
- * only when needed so the common case stays readable.
- */
-export function build_relationship_id(options: {
-  readonly kind: relationship_kind;
-  readonly from_id: string;
-  readonly to_name: string;
-  readonly file_path: string;
-  readonly line: number;
-  readonly disambiguator?: number | undefined;
-}): string {
-  const base = `${options.file_path}#${options.kind}:${options.from_id}->${options.to_name}@${options.line}`;
-  return options.disambiguator === undefined ? base : `${base}~${options.disambiguator}`;
 }
 
 /** True when an edge points at a known symbol rather than only a written name. */

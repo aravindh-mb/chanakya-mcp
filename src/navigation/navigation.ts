@@ -28,22 +28,22 @@ export interface navigation_options {
 }
 
 /** Where a symbol is declared. */
-export function find_definition(
-  options: navigation_options,
-  symbol_id: string,
-): find_definition_result {
+export function find_definition(options: navigation_options, symbol_id: string): find_definition_result {
   return { symbol: options.store.get_symbol(symbol_id) };
 }
 
 /** Every indexed occurrence of a symbol, definition included. */
-export function find_references(
-  options: navigation_options,
-  symbol_id: string,
-): find_references_result {
+export function find_references(options: navigation_options, symbol_id: string): find_references_result {
   const store = options.store;
   const references = store.get_references_to(symbol_id);
 
-  const enclosing_ids = [...new Set(references.flatMap((item) => (item.enclosing_symbol_id === undefined ? [] : [item.enclosing_symbol_id])))];
+  const enclosing_ids = [
+    ...new Set(
+      references.flatMap((item) =>
+        item.enclosing_symbol_id === undefined ? [] : [item.enclosing_symbol_id],
+      ),
+    ),
+  ];
   const symbols_by_id = new Map(store.get_symbols_by_ids(enclosing_ids).map((symbol) => [symbol.id, symbol]));
 
   return {
@@ -109,7 +109,10 @@ function is_symbol_id(id: string): boolean {
   return id.indexOf('#') !== -1;
 }
 
-function by_location(left: { file_path: string; line: number }, right: { file_path: string; line: number }): number {
+function by_location(
+  left: { file_path: string; line: number },
+  right: { file_path: string; line: number },
+): number {
   const by_path = left.file_path.localeCompare(right.file_path);
   return by_path !== 0 ? by_path : left.line - right.line;
 }

@@ -11,8 +11,8 @@
  * pointed at a guessed symbol.
  */
 
-import type { parsed_file, syntax_node } from '../parser/types.js';
-import { build_relationship_id, type relationship } from '../model/relationship.js';
+import type { parsed_file } from '../parser/types.js';
+import type { relationship } from '../model/relationship.js';
 import type { code_symbol } from '../model/symbol.js';
 import {
   build_scope_index,
@@ -36,7 +36,6 @@ export function extract_calls(options: extract_calls_options): readonly relation
   const tracker = new scope_tracker(build_start_index(symbols));
 
   const edges: relationship[] = [];
-  const used_ids = new Set<string>();
 
   for (const node of parsed.root.walk()) {
     // Advance on every node so the enclosing-symbol stack is accurate by the
@@ -61,48 +60,16 @@ export function extract_calls(options: extract_calls_options): readonly relation
     const to_name = chain === undefined ? callee.text : chain.join('.');
     const to_id = chain === undefined ? undefined : resolve_member_chain(scope, chain, enclosing_id)?.id;
 
-    edges.push(
-      build_call_edge(relative_path, node, enclosing_id ?? relative_path, to_name, to_id, used_ids),
-    );
+    edges.push({
+      kind: 'calls',
+      from_id: enclosing_id ?? relative_path,
+      to_id,
+      to_name,
+      confidence: 'certain',
+      file_path: relative_path,
+      line: node.range.start.line,
+    });
   }
 
   return edges;
-}
-
-function build_call_edge(
-  file_path: string,
-  call: syntax_node,
-  from_id: string,
-  to_name: string,
-  to_id: string | undefined,
-  used_ids: Set<string>,
-): relationship {
-  const line = call.range.start.line;
-
-  const base = build_relationship_id({
-    kind: 'calls',
-    from_id,
-    to_name,
-    file_path,
-    line,
-  });
-
-  let id = base;
-  let disambiguator = 2;
-  while (used_ids.has(id)) {
-    id = build_relationship_id({ kind: 'calls', from_id, to_name, file_path, line, disambiguator });
-    disambiguator += 1;
-  }
-  used_ids.add(id);
-
-  return {
-    id,
-    kind: 'calls',
-    from_id,
-    to_id,
-    to_name,
-    confidence: 'certain',
-    file_path,
-    line,
-  };
 }

@@ -63,7 +63,10 @@ describe('resolve_project_graph: call edges', () => {
   it('resolves a call through a named import', () => {
     index([
       ['src/user.ts', USER],
-      ['src/app.ts', "import { user_service } from './user';\nfunction main() { user_service.create_user(); }\n"],
+      [
+        'src/app.ts',
+        "import { user_service } from './user';\nfunction main() { user_service.create_user(); }\n",
+      ],
     ]);
 
     const app_symbol = store.find_symbols_by_name('main')[0];
@@ -104,7 +107,10 @@ describe('resolve_project_graph: call edges', () => {
     index([
       ['src/user.ts', USER],
       ['src/barrel.ts', "export { user_service } from './user';\n"],
-      ['src/app.ts', "import { user_service } from './barrel';\nfunction main() { user_service.create_user(); }\n"],
+      [
+        'src/app.ts',
+        "import { user_service } from './barrel';\nfunction main() { user_service.create_user(); }\n",
+      ],
     ]);
 
     const app_symbol = store.find_symbols_by_name('main')[0];
@@ -132,10 +138,7 @@ describe('resolve_project_graph: call edges', () => {
         'src/user.ts',
         'export namespace api {\n  export class user_service {\n    create_user() {}\n  }\n}\n',
       ],
-      [
-        'src/app.ts',
-        "import { api } from './user';\nfunction main() { api.user_service.create_user(); }\n",
-      ],
+      ['src/app.ts', "import { api } from './user';\nfunction main() { api.user_service.create_user(); }\n"],
     ]);
 
     const app_symbol = store.find_symbols_by_name('main')[0];
@@ -157,9 +160,7 @@ describe('resolve_project_graph: call edges', () => {
   });
 
   it('leaves an edge unresolved when the import points outside the project', () => {
-    index([
-      ['src/app.ts', "import { helper } from 'react';\nfunction main() { helper(); }\n"],
-    ]);
+    index([['src/app.ts', "import { helper } from 'react';\nfunction main() { helper(); }\n"]]);
 
     const app_symbol = store.find_symbols_by_name('main')[0];
     const edges = calls(store.get_relationships_from(app_symbol!.id));

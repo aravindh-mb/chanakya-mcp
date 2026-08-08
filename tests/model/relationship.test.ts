@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  build_relationship_id,
   is_relationship_kind,
   is_resolved,
   RELATIONSHIP_KINDS,
@@ -19,34 +18,6 @@ function make_edge(overrides: Partial<relationship> = {}): relationship {
     ...overrides,
   };
 }
-
-describe('build_relationship_id', () => {
-  it('encodes kind, endpoints and location', () => {
-    const id = build_relationship_id({
-      kind: 'calls',
-      from_id: 'src/a.ts#function:caller',
-      to_name: 'create_user',
-      file_path: 'src/a.ts',
-      line: 10,
-    });
-
-    expect(id).toBe('src/a.ts#calls:src/a.ts#function:caller->create_user@10');
-  });
-
-  it('distinguishes two calls to the same target on different lines', () => {
-    const base = { kind: 'calls', from_id: 'f', to_name: 'g', file_path: 'a.ts' } as const;
-
-    expect(build_relationship_id({ ...base, line: 1 })).not.toBe(build_relationship_id({ ...base, line: 2 }));
-  });
-
-  it('distinguishes edges of different kinds between the same symbols', () => {
-    const base = { from_id: 'f', to_name: 'g', file_path: 'a.ts', line: 1 } as const;
-
-    expect(build_relationship_id({ ...base, kind: 'calls' })).not.toBe(
-      build_relationship_id({ ...base, kind: 'references' }),
-    );
-  });
-});
 
 describe('is_resolved', () => {
   it('is true only when the edge points at a known symbol', () => {

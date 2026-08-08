@@ -159,10 +159,7 @@ function build_regex_matcher(options: build_matcher_options): line_matcher {
   const worker = spawn_regex_worker();
   let next_id = 0;
   let disposed = false;
-  const pending = new Map<
-    number,
-    { resolve(columns: number[]): void; reject(error: unknown): void }
-  >();
+  const pending = new Map<number, { resolve(columns: number[]): void; reject(error: unknown): void }>();
 
   const fail_pending = (error: unknown): void => {
     for (const entry of pending.values()) {

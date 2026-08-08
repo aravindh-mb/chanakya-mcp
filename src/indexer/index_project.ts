@@ -133,9 +133,7 @@ export async function index_project(options: index_project_options): Promise<ind
   if (stats.files_added + stats.files_updated + changes.deleted.length > 0) {
     // With the per-file graph stored, follow imports across files and point
     // every unresolved call edge at the symbol it actually calls.
-    resolve_project_graph(
-      options.logger === undefined ? { store } : { store, logger: options.logger },
-    );
+    resolve_project_graph(options.logger === undefined ? { store } : { store, logger: options.logger });
     store.optimize();
   }
 

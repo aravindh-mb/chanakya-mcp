@@ -98,7 +98,6 @@ export {
   type symbol_location,
 } from './model/symbol.js';
 export {
-  build_relationship_id,
   is_relationship_kind,
   is_resolved,
   RELATIONSHIP_KINDS,

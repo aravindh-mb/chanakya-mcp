@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { extract_file } from '../../src/extract/extract_file.js';
 import { resolve_project_graph } from '../../src/indexer/resolve_project_graph.js';
-import { find_callees, find_callers, find_definition, find_references } from '../../src/navigation/navigation.js';
+import {
+  find_callees,
+  find_callers,
+  find_definition,
+  find_references,
+} from '../../src/navigation/navigation.js';
 import { parse_source } from '../../src/parser/parse_file.js';
 import type { file_analysis } from '../../src/model/file.js';
 import { index_store } from '../../src/store/index_store.js';
@@ -90,10 +95,7 @@ describe('find_references', () => {
     index();
     const result = find_references({ store }, symbol('helper'));
 
-    expect(result.references.map((ref) => ref.file_path)).toEqual([
-      'src/user.ts',
-      'src/app.ts',
-    ]);
+    expect(result.references.map((ref) => ref.file_path)).toEqual(['src/user.ts', 'src/app.ts']);
     expect(result.references[0]?.is_definition).toBe(true);
     expect(result.references[1]?.is_definition).toBe(false);
   });
@@ -109,10 +111,7 @@ describe('find_references', () => {
     index();
     const result = find_references({ store }, symbol('user_service'));
 
-    expect(result.references.map((ref) => ref.file_path)).toEqual([
-      'src/user.ts',
-      'src/app.ts',
-    ]);
+    expect(result.references.map((ref) => ref.file_path)).toEqual(['src/user.ts', 'src/app.ts']);
   });
 });
 
@@ -141,17 +140,12 @@ describe('find_callees', () => {
     index();
     const result = find_callees({ store }, symbol('main'));
 
-    expect(result.callees.map((hit) => hit.callee?.name).sort()).toEqual([
-      'create_user',
-      'helper',
-    ]);
+    expect(result.callees.map((hit) => hit.callee?.name).sort()).toEqual(['create_user', 'helper']);
   });
 
   it('names a callee even when the edge is unresolved', () => {
     store.transaction(() => {
-      store.write_file_analysis(
-        analysis_for('src/standalone.ts', 'function main() { mystery(); }\n'),
-      );
+      store.write_file_analysis(analysis_for('src/standalone.ts', 'function main() { mystery(); }\n'));
     });
     resolve_project_graph({ store });
 

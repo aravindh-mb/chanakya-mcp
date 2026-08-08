@@ -4,7 +4,10 @@ import { extract_symbols } from '../../src/extract/symbol_extractor.js';
 import { parse_source } from '../../src/parser/parse_file.js';
 import type { relationship } from '../../src/model/relationship.js';
 
-function extract(source: string, relative_path = 'src/a.ts'): {
+function extract(
+  source: string,
+  relative_path = 'src/a.ts',
+): {
   readonly edges: readonly relationship[];
   readonly symbol_name_by_id: ReadonlyMap<string, string>;
 } {
@@ -54,9 +57,7 @@ describe('extract_calls', () => {
   });
 
   it('resolves a chain through an object-constant member', () => {
-    const { edges } = extract(
-      'const svc = { create_user() {} }; function main() { svc.create_user(); }',
-    );
+    const { edges } = extract('const svc = { create_user() {} }; function main() { svc.create_user(); }');
 
     // The object literal method is not a symbol, so the member call cannot
     // resolve and stays honest.
@@ -73,11 +74,14 @@ describe('extract_calls', () => {
     expect(edges[0]!.to_id).toBeUndefined();
   });
 
-  it('records two calls to the same target with distinct ids', () => {
+  it('leaves edge ids to the store', () => {
+    // The extractor no longer mints ids: the store assigns each row its own
+    // key, so identity lives at write time rather than extraction time.
     const { edges } = extract('function foo() {} foo(foo(1));');
 
     expect(edges).toHaveLength(2);
-    expect(edges[0]!.id).not.toBe(edges[1]!.id);
+    expect(edges[0]!.id).toBeUndefined();
+    expect(edges[1]!.id).toBeUndefined();
   });
 
   it('does not record dynamic import or require as calls', () => {

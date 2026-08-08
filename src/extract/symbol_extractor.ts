@@ -15,7 +15,7 @@
 import type { parsed_file, syntax_node } from '../parser/types.js';
 import type { language_id } from '../scanner/language.js';
 import { build_symbol_id, type code_symbol, type export_kind, type symbol_kind } from '../model/symbol.js';
-import { build_relationship_id, type relationship } from '../model/relationship.js';
+import type { relationship } from '../model/relationship.js';
 import {
   AMBIENT_DECLARATION,
   EXPORT_STATEMENT,
@@ -55,8 +55,6 @@ interface extraction_state {
   readonly relationships: relationship[];
   /** Guards against two declarations producing the same id in one file. */
   readonly used_ids: Set<string>;
-  /** Same guard for edges; see `build_relationship_id`. */
-  readonly used_edge_ids: Set<string>;
   readonly relative_path: string;
   readonly language: language_id;
   readonly source: string;
@@ -69,7 +67,6 @@ export function extract_symbols(options: extract_symbols_options): extracted_sym
     symbols: [],
     relationships: [],
     used_ids: new Set(),
-    used_edge_ids: new Set(),
     relative_path,
     language: parsed.language,
     source: parsed.source,
@@ -158,7 +155,7 @@ function visit(
   state.symbols.push(symbol);
 
   if (context.parent_id !== undefined) {
-    state.relationships.push(create_contains_edge(context.parent_id, symbol, state.relative_path, state));
+    state.relationships.push(create_contains_edge(context.parent_id, symbol, state.relative_path));
   }
 
   visit_children(
@@ -321,23 +318,8 @@ function allocate_unique_id(
   }
 }
 
-function create_contains_edge(
-  parent_id: string,
-  symbol: code_symbol,
-  relative_path: string,
-  state: extraction_state,
-): relationship {
+function create_contains_edge(parent_id: string, symbol: code_symbol, relative_path: string): relationship {
   return {
-    id: allocate_unique_id(state.used_edge_ids, (disambiguator) =>
-      build_relationship_id({
-        kind: 'contains',
-        from_id: parent_id,
-        to_name: symbol.name,
-        file_path: relative_path,
-        line: symbol.start_line,
-        disambiguator,
-      }),
-    ),
     kind: 'contains',
     from_id: parent_id,
     to_id: symbol.id,

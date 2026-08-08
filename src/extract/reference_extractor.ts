@@ -104,7 +104,6 @@ export function extract_references(options: extract_references_options): readonl
   const tracker = new scope_tracker(symbols_by_start);
 
   const references: code_reference[] = [];
-  const used_ids = new Set<string>();
 
   for (const node of parsed.root.walk()) {
     // The tracker must see every node: symbol starts align with declaration
@@ -117,20 +116,9 @@ export function extract_references(options: extract_references_options): readonl
     }
 
     const reference = classify(node, relative_path, scope, symbols_by_start, enclosing_id);
-    if (reference === undefined) {
-      continue;
+    if (reference !== undefined) {
+      references.push(reference);
     }
-
-    const base_id = `${relative_path}#ref:${reference.name}@${reference.line}:${reference.column}`;
-    let id = base_id;
-    let disambiguator = 2;
-    while (used_ids.has(id)) {
-      id = `${base_id}~${disambiguator}`;
-      disambiguator += 1;
-    }
-    used_ids.add(id);
-
-    references.push({ ...reference, id });
   }
 
   return references;
@@ -155,7 +143,6 @@ function classify(
       return undefined;
     }
     return {
-      id: '',
       file_path: relative_path,
       name: node.text,
       // A declaration's name binds the symbol whose declaration is its parent
@@ -177,7 +164,11 @@ function classify(
     return undefined;
   }
 
-  if (parent.type === 'call_expression' && field_node_matches(parent, 'function', node) && node.text === 'require') {
+  if (
+    parent.type === 'call_expression' &&
+    field_node_matches(parent, 'function', node) &&
+    node.text === 'require'
+  ) {
     // The CommonJS global, handled by the import extractor instead.
     return undefined;
   }
@@ -185,7 +176,6 @@ function classify(
   if (parent.type === 'member_expression' && field_node_matches(parent, 'property', node)) {
     const chain = read_chain(parent);
     return {
-      id: '',
       file_path: relative_path,
       name: node.text,
       symbol_id: chain === undefined ? undefined : resolve_member_chain(scope, chain, enclosing_id)?.id,
@@ -197,7 +187,6 @@ function classify(
   }
 
   return {
-    id: '',
     file_path: relative_path,
     name: node.text,
     symbol_id: resolve_name(scope, node.text, enclosing_id)?.id,

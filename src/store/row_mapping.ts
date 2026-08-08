@@ -31,9 +31,12 @@ export interface file_row {
 }
 
 export interface symbol_row {
+  /** Internal rowid. Not part of the public model. */
+  key: number;
   id: string;
   name: string;
   kind: string;
+  /** Joined from `files`. */
   file_path: string;
   language: string;
   start_line: number;
@@ -47,18 +50,24 @@ export interface symbol_row {
 }
 
 export interface relationship_row {
-  id: string;
+  /** Internal rowid. Surfaced as the opaque `id`. */
+  key: number;
   kind: string;
+  /** Joined from `symbols`/`files`; a file path for file-level edges. */
   from_id: string;
+  /** Joined from `symbols`. */
   to_id: string | null;
   to_name: string;
   confidence: string;
+  /** Joined from `files`. */
   file_path: string;
   line: number;
 }
 
 export interface import_row {
-  id: string;
+  /** Internal rowid. Surfaced as the opaque `id`. */
+  key: number;
+  /** Joined from `files`. */
   file_path: string;
   kind: string;
   module_specifier: string;
@@ -70,21 +79,28 @@ export interface import_row {
 }
 
 export interface export_row {
-  id: string;
+  /** Internal rowid. Surfaced as the opaque `id`. */
+  key: number;
+  /** Joined from `files`. */
   file_path: string;
   kind: string;
   exported_name: string;
   local_name: string | null;
+  /** Joined from `symbols`. */
   symbol_id: string | null;
   module_specifier: string | null;
   line: number;
 }
 
 export interface reference_row {
-  id: string;
+  /** Internal rowid. Surfaced as the opaque `id`. */
+  key: number;
+  /** Joined from `files`. */
   file_path: string;
   name: string;
+  /** Joined from `symbols`. */
   symbol_id: string | null;
+  /** Joined from `symbols`. */
   enclosing_symbol_id: string | null;
   line: number;
   column: number;
@@ -143,7 +159,7 @@ export function to_code_symbol(row: symbol_row): code_symbol {
 
 export function to_relationship(row: relationship_row): relationship {
   return {
-    id: row.id,
+    id: String(row.key),
     kind: row.kind as relationship_kind,
     from_id: row.from_id,
     to_id: from_sql_nullable(row.to_id),
@@ -156,7 +172,7 @@ export function to_relationship(row: relationship_row): relationship {
 
 export function to_code_import(row: import_row): code_import {
   return {
-    id: row.id,
+    id: String(row.key),
     file_path: row.file_path,
     kind: row.kind as import_kind,
     module_specifier: row.module_specifier,
@@ -170,7 +186,7 @@ export function to_code_import(row: import_row): code_import {
 
 export function to_code_export(row: export_row): code_export {
   return {
-    id: row.id,
+    id: String(row.key),
     file_path: row.file_path,
     kind: row.kind as export_kind_detail,
     exported_name: row.exported_name,
@@ -183,7 +199,7 @@ export function to_code_export(row: export_row): code_export {
 
 export function to_code_reference(row: reference_row): code_reference {
   return {
-    id: row.id,
+    id: String(row.key),
     file_path: row.file_path,
     name: row.name,
     symbol_id: from_sql_nullable(row.symbol_id),

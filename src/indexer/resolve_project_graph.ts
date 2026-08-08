@@ -66,7 +66,7 @@ export function resolve_project_graph(options: resolve_project_graph_options): r
           files,
         });
         if (target !== undefined) {
-          store.set_import_resolved_path(item.id, target);
+          store.set_import_resolved_path(item.id!, target);
           resolved = { ...item, resolved_path: target };
           imports_resolved += 1;
         }
@@ -82,15 +82,22 @@ export function resolve_project_graph(options: resolve_project_graph_options): r
     for (const edge of store.get_unresolved_call_edges()) {
       const target = resolve_edge_target(edge, files, imports_by_file, exports_by_file, store);
       if (target !== undefined) {
-        store.set_edge_target(edge.id, target);
+        // The id is assigned by the store and always present on a read row.
+        store.set_edge_target(edge.id!, target);
         edges_resolved += 1;
       }
     }
 
     for (const reference of store.get_unresolved_references()) {
-      const target = resolve_reference_target(reference.name, reference.file_path, files, imports_by_file, exports_by_file);
+      const target = resolve_reference_target(
+        reference.name,
+        reference.file_path,
+        files,
+        imports_by_file,
+        exports_by_file,
+      );
       if (target !== undefined) {
-        store.set_reference_target(reference.id, target);
+        store.set_reference_target(reference.id!, target);
         references_resolved += 1;
       }
     }
@@ -110,7 +117,7 @@ function resolve_edge_target(
   exports_by_file: ReadonlyMap<string, readonly code_export[]>,
   store: index_store,
 ): string | undefined {
-  const from_file = from_id_part(edge.from_id);
+  const from_file = edge.file_path;
   const segments = edge.to_name.split('.');
   const binding = segments[0] as string;
 
@@ -140,14 +147,7 @@ function resolve_edge_target(
     return undefined;
   }
 
-  const base = resolve_exported_name(
-    target_file,
-    exported_name,
-    files,
-    exports_by_file,
-    new Set(),
-    0,
-  );
+  const base = resolve_exported_name(target_file, exported_name, files, exports_by_file, new Set(), 0);
   if (base === undefined) {
     return undefined;
   }
@@ -191,12 +191,6 @@ function resolve_reference_target(
   );
 }
 
-/** The file a symbol id or file id belongs to: everything before the `#`. */
-function from_id_part(from_id: string): string {
-  const hash = from_id.indexOf('#');
-  return hash === -1 ? from_id : from_id.slice(0, hash);
-}
-
 /**
  * The symbol id a file exports under a given name, following re-exports.
  *
@@ -225,7 +219,8 @@ function resolve_exported_name(
   const exports = exports_by_file.get(file_path) ?? [];
 
   const local = exports.find(
-    (item) => item.exported_name === exported_name && item.kind !== 're_export' && item.symbol_id !== undefined,
+    (item) =>
+      item.exported_name === exported_name && item.kind !== 're_export' && item.symbol_id !== undefined,
   );
   if (local !== undefined) {
     return local.symbol_id;
@@ -233,7 +228,11 @@ function resolve_exported_name(
 
   // An explicit re-export of this exact name: `export { a as b } from 'm'`.
   for (const item of exports) {
-    if (item.kind !== 're_export' || item.exported_name !== exported_name || item.module_specifier === undefined) {
+    if (
+      item.kind !== 're_export' ||
+      item.exported_name !== exported_name ||
+      item.module_specifier === undefined
+    ) {
       continue;
     }
     const next = resolve_specifier(file_path, item.module_specifier, files);
@@ -264,12 +263,20 @@ function resolve_exported_name(
   return undefined;
 }
 
-function resolve_specifier(from_file_path: string, module_specifier: string, files: file_index): string | undefined {
+function resolve_specifier(
+  from_file_path: string,
+  module_specifier: string,
+  files: file_index,
+): string | undefined {
   return resolve_module_specifier({ from_file_path, module_specifier, files });
 }
 
 /** Walk the member chain of a symbol, requiring each step to resolve. */
-function walk_members(store: index_store, symbol_id: string, segments: readonly string[]): string | undefined {
+function walk_members(
+  store: index_store,
+  symbol_id: string,
+  segments: readonly string[],
+): string | undefined {
   let current: code_symbol | undefined = store.get_symbol(symbol_id);
   for (const segment of segments) {
     if (current === undefined) {
