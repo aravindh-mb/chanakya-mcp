@@ -1,59 +1,70 @@
-# Architecture
+# System Architecture
+
+Codebrain MCP is engineered around a clean, layered pipeline that decouples concrete syntax parsers from the higher-level code intelligence and MCP protocols.
+
+<div class="custom-banner">
+  <div class="custom-banner-icon">🏛️</div>
+  <div class="custom-banner-content">
+    <h4>Layered Separation of Concerns</h4>
+    <p>Tree-Sitter grammars remain isolated at the parser boundary. The rest of the system operates on language-independent code models and relational SQL.</p>
+  </div>
+</div>
+
+---
+
+## Architectural Data Pipeline
 
 ```
-project files
-    -> file scanner            (Phase 2)
-    -> language detection      (Phase 2)
-    -> tree-sitter parser      (Phase 3)
-    -> normalized code model   (Phase 4-5)
-    -> sqlite index            (Phase 6-7)
-    -> relationship graph      (Phase 10)
-    -> search engine           (Phase 8-9)
-    -> mcp server              (Phase 11)
-    -> claude / cursor / other agents
+Project Files on Disk
+       ↓
+[1] File Scanner & .gitignore Cascade      (src/scanner/)
+       ↓
+[2] Native Tree-Sitter Parser             (src/parser/)
+       ↓
+[3] Normalized Code Model & Extraction    (src/model/, src/extract/)
+       ↓
+[4] Relational SQLite Database Store       (src/store/, src/indexer/)
+       ↓
+[5] Navigation, Graph & Search Engines    (src/navigation/, src/search/, src/graph/)
+       ↓
+[6] MCP Stdio Protocol & Safe Edits        (src/mcp/, src/edit/)
+       ↓
+AI Coding Clients (Claude Code, Cursor, Windsurf, Cline)
 ```
 
-Key design decision: there is **no unified AST**. Each language keeps its own tree-sitter grammar, and a
-thin normalization layer maps it into a language-independent code model. Only the normalization layer knows
-about tree-sitter; nothing above it does.
+---
 
-## Modules
+## Source Directory Layout
 
-```
+```text
 src/
-  cli/         argv parsing, help text, CLI orchestration
-  core/        errors, logger, package metadata, project root + path containment
-  scanner/     file discovery, language detection, ignore rules
-  parser/      tree-sitter integration, normalized syntax nodes
-  model/       symbols, relationships, imports/exports/references
-  extract/     syntax tree -> symbols and contains edges
-  store/       sqlite schema, queries, row mapping
-  indexer/     scan -> parse -> extract -> store
-  navigation/  find_definition, find_references, find_callers, find_callees
-  context/     get_symbol_context
-  graph/       get_dependencies, get_dependents
-  search/      symbol and text search, regex safety
-  edit/        apply_patch, replace_symbol, rename_symbol
-  mcp/         stdio server: JSON-RPC protocol, tool registry
-  index.ts     public library exports
+├── cli/         CLI command parsing, argument flags, help text, startup
+├── core/        Errors, structured logger, package metadata, project roots & path containment
+├── scanner/     File discovery, .gitignore traversal, language detection
+├── parser/      Native Tree-Sitter N-API integration, normalized syntax nodes
+├── model/       Language-independent symbols, relationships, imports, exports
+├── extract/     AST walking, symbol extraction, contains edges, call detection
+├── store/       SQLite database schema, prepared queries, transaction batching
+├── indexer/     Orchestration: scan -> parse -> extract -> store + file watcher
+├── navigation/  find_definition, find_references, get_callers, get_callees
+├── context/     get_symbol_context 360-degree aggregator
+├── graph/       get_dependencies, get_dependents
+├── search/      Symbol search, fulltext search, worker-thread ReDoS isolation
+├── edit/        Safe edits: apply_patch, replace_symbol, rename_symbol
+├── mcp/         MCP stdio server: JSON-RPC 2.0 protocol, Zod schemas, tool registry
+└── index.ts     Public library API exports
 ```
 
-## Conventions
+---
 
-Two path conventions hold throughout, so that index keys are identical on every operating system:
-absolute **native** paths are used for filesystem access, and **POSIX** paths relative to the project
-root are used as identifiers in the index and in MCP responses.
+## Core Engineering Conventions
 
-A file inside the project has exactly one canonical identity. A symlinked file is reported under its real
-path, never the link's, so an alias can neither shadow nor duplicate the real file in the index.
+### 1. Dual Path Representation
+- **Native OS Paths:** Used internally for local filesystem I/O (`C:\repo\src\main.ts` or `/home/user/repo/src/main.ts`).
+- **Canonical POSIX Paths:** Used for all index IDs, database keys, and MCP responses (`src/main.ts`), guaranteeing identical index behavior across Windows, macOS, and Linux.
 
-Code conventions: TypeScript strict mode with `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes`,
-`snake_case` naming (enforced by ESLint), no `any`, no silently swallowed errors, errors carry a
-machine-readable code and a fix hint, and small modules — no abstraction without a second caller.
+### 2. Standard Output Protocol Isolation
+`stdout` is strictly reserved for the MCP JSON-RPC protocol. All logs, diagnostics, progress statistics, and debug output are routed to `stderr`.
 
-**stdout is reserved for the MCP protocol.** All diagnostics go to stderr.
-
-## Phases
-
-The project was built in twenty phases. Phases 1–17 are implemented; phase 15 (semantic search) is
-deliberately deferred, and publishing (phase 20) is pending. See [Roadmap](/roadmap).
+### 3. Actionable Machine-Readable Errors
+All business and validation errors carry a machine-readable `code`, descriptive message, and an actionable `hint` allowing AI agents to self-correct automatically.

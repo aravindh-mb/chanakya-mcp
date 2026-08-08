@@ -1,17 +1,22 @@
 import DefaultTheme from 'vitepress/theme';
 import type { Theme } from 'vitepress';
 import BenchChart from './BenchChart.vue';
+import AgentTabs from './AgentTabs.vue';
+import ToolPlayground from './ToolPlayground.vue';
+import HeroStars from './HeroStars.vue';
+import './custom.css';
 
 /**
- * Registers the benchmark chart globally so pages can drop `<BenchChart />` in.
- *
- * The component reads `.vitepress/sample-benchmark.json`, which `pnpm run
- * bench:sample` regenerates, so the published numbers move with the benchmark
- * instead of being copied into prose and going stale.
+ * Enhanced VitePress theme with custom components and modern styling.
  */
 export default {
   extends: DefaultTheme,
-  enhanceApp({ app }) {
-    app.component('BenchChart', BenchChart);
+  Layout: DefaultTheme.Layout,
+  enhanceApp(ctx) {
+    DefaultTheme.enhanceApp?.(ctx);
+    ctx.app.component('BenchChart', BenchChart);
+    ctx.app.component('AgentTabs', AgentTabs);
+    ctx.app.component('ToolPlayground', ToolPlayground);
+    ctx.app.component('HeroStars', HeroStars);
   },
 } satisfies Theme;

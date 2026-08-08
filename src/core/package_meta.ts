@@ -21,8 +21,8 @@ export interface package_meta {
 }
 
 const FALLBACK_META: package_meta = {
-  name: '@code-intelligence/mcp',
-  version: '0.0.0',
+  name: '@aravindh-arumugam/codebrain-mcp',
+  version: '1.1.0',
 };
 
 let cached_meta: package_meta | undefined;

@@ -1,37 +1,79 @@
-# Edits
+# Safe & Atomic Code Edits
 
-Three edit tools write files and reindex automatically, and each is safe by construction:
+Codebrain MCP provides three AST-aware edit tools: **`apply_patch`**, **`replace_symbol`**, and **`rename_symbol`**. Each tool enforces strict validation to guarantee safety and prevent unintended code corruption.
 
-- **`apply_patch`** applies exact text replacements in order. An `old_text` that does not match, or
-  matches more than once, refuses the whole call rather than guessing.
-- **`replace_symbol`** splices new source over a symbol's declaration at the exact source range the index
-  recorded — no fuzzy matching.
-- **`rename_symbol`** renames a symbol at its declaration, every resolved reference, and the import and
-  export bindings that connect it to other files (including re-exports through barrels). Occurrences the
-  index could not resolve are left alone.
+<div class="custom-banner">
+  <div class="custom-banner-icon">🛡️</div>
+  <div class="custom-banner-content">
+    <h4>Zero Silent Corruption</h4>
+    <p>Edits are strictly atomic and validated. Any ambiguity, stale file content, or path escape immediately aborts the operation with an actionable error.</p>
+  </div>
+</div>
 
-## Why edits are safe
+---
 
-Edits never escape the project root, and a file whose content drifted from the index since the last run
-refuses any edit to it — every edit requires a fresh index. Because the index refreshes on each edit, a
-second edit is checked against the state the first one produced.
+## The 3 Edit Tools
 
-### Path containment
+### 1. `apply_patch` — Ordered Exact Replacement
+`apply_patch` takes an array of `{ old_text, new_text }` pairs and applies them in strict sequential order to a file.
 
-Every path an agent can pass to an edit tool is resolved against the project root and must stay inside
-it. The check runs twice: once lexically (rejecting `..`, absolute paths, and drive forms) and once
-against **real paths**, so a symlink or junction inside the project that points outside the root cannot
-smuggle a read or write out of the tree.
+```typescript
+call_tool("apply_patch", {
+  path: "src/config/database.ts",
+  edits: [
+    {
+      old_text: "const POOL_SIZE = 10;",
+      new_text: "const POOL_SIZE = 25;"
+    }
+  ]
+});
+```
 
-### Stale-content rejection
+- **Single Match Guarantee:** If `old_text` matches 0 times or more than 1 time in the file, the entire patch is rejected.
+- **Automatic Reindexing:** The modified file is automatically re-parsed and its index rows refreshed in SQLite.
 
-An edit tool refuses to touch a file whose bytes no longer match what the index recorded, so a patch
-based on out-of-date locations cannot silently clobber unrelated changes. This is what makes a second
-edit safe: the index refreshes after the first, so the second edit is validated against the state the
-first produced.
+---
 
-### Exactness over guessing
+### 2. `replace_symbol` — AST Range Splicing
+`replace_symbol` replaces an entire symbol declaration using the exact UTF-16 code unit offset recorded by the AST index.
 
-`apply_patch` requires each `old_text` to match exactly once. A missing match means the file drifted
-from what the caller expected; an ambiguous one means the caller did not say precisely enough. Both are
-refused rather than guessed, because a fuzzy patch is how silent corruption happens.
+```typescript
+call_tool("replace_symbol", {
+  id: "src/utils/format.ts#function:format_currency",
+  new_source: `export function format_currency(cents: number): string {
+  return (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+}`
+});
+```
+
+- **Zero Fuzzy Guessing:** Slices directly into the recorded syntax node range.
+- **Header & Body Replacement:** Replaces signature, docstrings, and body atomically.
+
+---
+
+### 3. `rename_symbol` — Cross-File Global Renaming
+`rename_symbol` renames a symbol at its declaration, across every resolved reference in all files, and through re-export barrel files.
+
+```typescript
+call_tool("rename_symbol", {
+  id: "src/models/user.ts#interface:UserEntity",
+  new_name: "UserProfile"
+});
+```
+
+- **Transaction Integrity:** Modifications to multiple files are coordinated atomically.
+- **Safe Reference Scope:** Renames only symbols that resolved with certainty; unresolvable dynamic names are left untouched.
+
+---
+
+## Safety Guarantees & Defenses
+
+### 1. Realpath Containment Sandboxing
+Every target path supplied to an edit tool is validated twice:
+1. **Lexical Validation:** Rejects parent directory traversal (`..`), absolute paths, or protocol URLs.
+2. **Realpath Resolution:** Resolves symbolic links and NTFS junctions to confirm that the real target file resides strictly within the project root directory.
+
+### 2. Stale Content & Drift Rejection
+Before modifying any file on disk, Codebrain verifies that the file's current size, modification timestamp, and content hash match what is stored in the index.
+
+If a developer edited a file in their IDE while the agent was processing, Codebrain **refuses the edit**, triggers an instant incremental reindex, and reports the drift back to the agent so it can regenerate the edit against fresh code.

@@ -1,6 +1,146 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <rect width="64" height="64" rx="12" fill="#0ea5e9" />
-  <path d="M24 22 L14 32 L24 42" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-  <path d="M40 22 L50 32 L40 42" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-  <path d="M35 18 L29 46" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="50%" stop-color="#1e1b4b" />
+      <stop offset="100%" stop-color="#090d16" />
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="50%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#a855f7" />
+    </linearGradient>
+    <linearGradient id="glowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#ec4899" stop-opacity="0.9" />
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <style>
+    @keyframes starBlink {
+      0%, 100% {
+        opacity: 0.35;
+        transform: scale(0.9);
+      }
+      50% {
+        opacity: 1;
+        transform: scale(1.45);
+      }
+    }
+    @keyframes pulseHex {
+      0%, 100% { stroke-opacity: 0.6; }
+      50% { stroke-opacity: 1; filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.7)); }
+    }
+    .star-node {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: starBlink 3.6s infinite ease-in-out;
+    }
+    .star-1 { animation-delay: 0.0s; }
+    .star-2 { animation-delay: 0.4s; }
+    .star-3 { animation-delay: 0.8s; }
+    .star-4 { animation-delay: 1.2s; }
+    .star-5 { animation-delay: 1.6s; }
+    .star-6 { animation-delay: 2.0s; }
+    .star-7 { animation-delay: 2.4s; }
+    .star-8 { animation-delay: 2.8s; }
+    .star-9 { animation-delay: 3.2s; }
+    .star-core { animation-delay: 1.0s; }
+    .hex-core { animation: pulseHex 4s infinite ease-in-out; }
+  </style>
+
+  <!-- Background rounded squircle -->
+  <rect width="256" height="256" rx="56" fill="url(#bgGrad)" stroke="#334155" stroke-width="2" />
+
+  <!-- Subtle grid pattern in background -->
+  <g opacity="0.12" stroke="#94a3b8" stroke-width="1">
+    <line x1="32" y1="64" x2="224" y2="64" />
+    <line x1="32" y1="128" x2="224" y2="128" />
+    <line x1="32" y1="192" x2="224" y2="192" />
+    <line x1="64" y1="32" x2="64" y2="224" />
+    <line x1="128" y1="32" x2="128" y2="224" />
+    <line x1="192" y1="32" x2="192" y2="224" />
+  </g>
+
+  <!-- Glowing Neural Synapse Connections / AST Graph -->
+  <g stroke="url(#accentGrad)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9" filter="url(#softGlow)">
+    <path d="M128 48 L80 96 L60 156 L88 204" fill="none" />
+    <path d="M128 48 L176 96 L196 156 L168 204" fill="none" />
+    <path d="M128 48 L128 116" fill="none" />
+    <path d="M128 116 L88 152 L128 208 L168 152 L128 116" fill="none" stroke-width="2.5" opacity="0.75" />
+    <path d="M80 96 L128 116 L176 96" fill="none" />
+    <path d="M60 156 L88 152" fill="none" />
+    <path d="M196 156 L168 152" fill="none" />
+  </g>
+
+  <!-- Central Code Hexagon -->
+  <g class="hex-core" filter="url(#glow)">
+    <polygon points="128,76 166,98 166,142 128,164 90,142 90,98" fill="#1e1b4b" fill-opacity="0.8" stroke="url(#glowGrad)" stroke-width="3.5" />
+  </g>
+
+  <!-- Code Brackets < / > in Center -->
+  <g stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M112 110 L102 120 L112 130" fill="none" />
+    <path d="M144 110 L154 120 L144 130" fill="none" />
+    <line x1="133" y1="108" x2="123" y2="132" stroke="#38bdf8" stroke-width="3" />
+  </g>
+
+  <!-- Glowing Star Nodes that blink one at a time -->
+  <!-- Top Root Star -->
+  <g class="star-node star-1">
+    <circle cx="128" cy="48" r="9" fill="#38bdf8" filter="url(#glow)" />
+    <circle cx="128" cy="48" r="4" fill="#ffffff" />
+  </g>
+
+  <!-- Level 1 Stars -->
+  <g class="star-node star-2">
+    <circle cx="80" cy="96" r="7.5" fill="#6366f1" filter="url(#softGlow)" />
+    <circle cx="80" cy="96" r="3" fill="#ffffff" />
+  </g>
+  <g class="star-node star-3">
+    <circle cx="176" cy="96" r="7.5" fill="#6366f1" filter="url(#softGlow)" />
+    <circle cx="176" cy="96" r="3" fill="#ffffff" />
+  </g>
+
+  <!-- Level 2 Stars -->
+  <g class="star-node star-4">
+    <circle cx="60" cy="156" r="7" fill="#818cf8" filter="url(#softGlow)" />
+    <circle cx="60" cy="156" r="2.5" fill="#ffffff" />
+  </g>
+  <g class="star-node star-5">
+    <circle cx="196" cy="156" r="7" fill="#818cf8" filter="url(#softGlow)" />
+    <circle cx="196" cy="156" r="2.5" fill="#ffffff" />
+  </g>
+
+  <!-- Inner Stars -->
+  <g class="star-node star-6">
+    <circle cx="88" cy="152" r="6" fill="#a855f7" filter="url(#softGlow)" />
+    <circle cx="88" cy="152" r="2" fill="#ffffff" />
+  </g>
+  <g class="star-node star-7">
+    <circle cx="168" cy="152" r="6" fill="#a855f7" filter="url(#softGlow)" />
+    <circle cx="168" cy="152" r="2" fill="#ffffff" />
+  </g>
+
+  <!-- Base Stars -->
+  <g class="star-node star-8">
+    <circle cx="88" cy="204" r="8" fill="#38bdf8" filter="url(#glow)" />
+    <circle cx="88" cy="204" r="3.5" fill="#ffffff" />
+  </g>
+  <g class="star-node star-core">
+    <circle cx="128" cy="208" r="9.5" fill="#ec4899" filter="url(#glow)" />
+    <circle cx="128" cy="208" r="4" fill="#ffffff" />
+  </g>
+  <g class="star-node star-9">
+    <circle cx="168" cy="204" r="8" fill="#38bdf8" filter="url(#glow)" />
+    <circle cx="168" cy="204" r="3.5" fill="#ffffff" />
+  </g>
 </svg>

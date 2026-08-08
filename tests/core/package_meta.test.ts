@@ -5,7 +5,7 @@ describe('read_package_meta', () => {
   it('reads the package name and a semver-shaped version', () => {
     const meta = read_package_meta();
 
-    expect(meta.name).toBe('@code-intelligence/mcp');
+    expect(meta.name).toBe('@aravindh-arumugam/codebrain-mcp');
     expect(meta.version).toMatch(/^\d+\.\d+\.\d+/);
   });
 

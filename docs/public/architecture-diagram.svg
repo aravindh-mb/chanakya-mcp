@@ -1,0 +1,160 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520" width="100%" height="100%">
+  <defs>
+    <linearGradient id="cardBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="heroGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#06b6d4" />
+      <stop offset="50%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#8b5cf6" />
+    </linearGradient>
+    <linearGradient id="badgeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#818cf8" />
+    </linearGradient>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.4" />
+    </filter>
+    <filter id="neon" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="3" result="glow" />
+      <feComposite in="SourceGraphic" in2="glow" operator="over" />
+    </filter>
+  </defs>
+
+  <style>
+    .title { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-weight: 700; fill: #f8fafc; font-size: 16px; }
+    .subtitle { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-weight: 400; fill: #94a3b8; font-size: 12px; }
+    .tag { font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 11px; fill: #38bdf8; font-weight: 600; }
+    .badge { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; font-weight: 600; fill: #ffffff; }
+    .metric { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; fill: #10b981; }
+  </style>
+
+  <!-- Canvas Background -->
+  <rect width="900" height="520" rx="16" fill="#090d16" stroke="#1e293b" stroke-width="1.5" />
+
+  <!-- Subtle Ambient Glow Orbs -->
+  <circle cx="150" cy="120" r="180" fill="#38bdf8" opacity="0.04" filter="blur(40px)" />
+  <circle cx="750" cy="380" r="180" fill="#8b5cf6" opacity="0.05" filter="blur(40px)" />
+
+  <!-- TOP LAYER: AI Clients & MCP Protocol -->
+  <g transform="translate(40, 30)">
+    <rect width="820" height="74" rx="12" fill="url(#cardBg)" stroke="#334155" stroke-width="1.5" filter="url(#shadow)" />
+    
+    <rect x="20" y="18" width="38" height="38" rx="8" fill="#3b82f6" opacity="0.2" />
+    <path d="M30 32 L39 24 L48 32 L39 40 Z" fill="none" stroke="#60a5fa" stroke-width="2" />
+    <text x="70" y="42" class="title">AI Coding Agents (Claude Code, Cursor, Windsurf, Cline)</text>
+    <text x="70" y="58" class="subtitle">Standard Model Context Protocol over stdio (JSON-RPC 2.0) • Zero Network Calls</text>
+    
+    <rect x="660" y="24" width="136" height="26" rx="13" fill="#1e1b4b" stroke="#6366f1" stroke-width="1" />
+    <text x="728" y="41" class="badge" text-anchor="middle">14 MCP Tools</text>
+  </g>
+
+  <!-- Connectors Down -->
+  <g stroke="#3b82f6" stroke-width="2" stroke-dasharray="4 4" opacity="0.6">
+    <line x1="200" y1="104" x2="200" y2="140" />
+    <line x1="450" y1="104" x2="450" y2="140" />
+    <line x1="700" y1="104" x2="700" y2="140" />
+  </g>
+
+  <!-- MIDDLE LAYER: 3 Core Engines -->
+  
+  <!-- Box 1: File Scanner & Watcher -->
+  <g transform="translate(40, 140)">
+    <rect width="250" height="190" rx="12" fill="url(#cardBg)" stroke="#334155" stroke-width="1.5" filter="url(#shadow)" />
+    <rect x="16" y="16" width="32" height="32" rx="6" fill="#0284c7" opacity="0.2" />
+    <path d="M26 32 L32 26 L38 32 M32 26 L32 38" stroke="#38bdf8" stroke-width="2" fill="none" stroke-linecap="round" />
+    
+    <text x="56" y="32" class="title">1. Scanner &amp; Watcher</text>
+    <text x="56" y="46" class="tag">Incremental Sync</text>
+    
+    <line x1="16" y1="62" x2="234" y2="62" stroke="#1e293b" stroke-width="1" />
+    
+    <text x="16" y="84" class="subtitle">• Recursive .gitignore cascade</text>
+    <text x="16" y="104" class="subtitle">• 2-Stage Change Detection (mtime + hash)</text>
+    <text x="16" y="124" class="subtitle">• Racy-clean timestamp protection</text>
+    <text x="16" y="144" class="subtitle">• Realpath traversal containment</text>
+    <text x="16" y="168" class="metric">18ms incremental stat check</text>
+  </g>
+
+  <!-- Box 2: Native Tree-Sitter & Code Model -->
+  <g transform="translate(325, 140)">
+    <rect width="250" height="190" rx="12" fill="url(#cardBg)" stroke="#3b82f6" stroke-width="1.5" filter="url(#shadow)" />
+    <rect x="16" y="16" width="32" height="32" rx="6" fill="#6366f1" opacity="0.2" />
+    <path d="M24 24 L40 40 M40 24 L24 40" stroke="#818cf8" stroke-width="2" stroke-linecap="round" />
+    
+    <text x="56" y="32" class="title">2. Tree-Sitter Engine</text>
+    <text x="56" y="46" class="tag">AST &amp; Code Model</text>
+    
+    <line x1="16" y1="62" x2="234" y2="62" stroke="#1e293b" stroke-width="1" />
+    
+    <text x="16" y="84" class="subtitle">• Native N-API bindings (No WASM lag)</text>
+    <text x="16" y="104" class="subtitle">• JS, JSX, TS, TSX, .d.ts grammars</text>
+    <text x="16" y="124" class="subtitle">• 9 Symbol kinds, 7 relationship types</text>
+    <text x="16" y="144" class="subtitle">• Error-tolerant AST recovery</text>
+    <text x="16" y="168" class="metric">117 files/sec parsing speed</text>
+  </g>
+
+  <!-- Box 3: Search, Navigation & Safe Edits -->
+  <g transform="translate(610, 140)">
+    <rect width="250" height="190" rx="12" fill="url(#cardBg)" stroke="#334155" stroke-width="1.5" filter="url(#shadow)" />
+    <rect x="16" y="16" width="32" height="32" rx="6" fill="#10b981" opacity="0.2" />
+    <circle cx="32" cy="32" r="7" stroke="#34d399" stroke-width="2" fill="none" />
+    <line x1="37" y1="37" x2="43" y2="43" stroke="#34d399" stroke-width="2" stroke-linecap="round" />
+    
+    <text x="56" y="32" class="title">3. Tools &amp; Safe Edits</text>
+    <text x="56" y="46" class="tag">Symbol Intelligence</text>
+    
+    <line x1="16" y1="62" x2="234" y2="62" stroke="#1e293b" stroke-width="1" />
+    
+    <text x="16" y="84" class="subtitle">• Tri-tier ranked search (exact/prefix/sub)</text>
+    <text x="16" y="104" class="subtitle">• Worker-thread ReDoS safe regex</text>
+    <text x="16" y="124" class="subtitle">• Atomic apply_patch &amp; rename_symbol</text>
+    <text x="16" y="144" class="subtitle">• Stale-content drift rejection</text>
+    <text x="16" y="168" class="metric">0.05ms symbol lookup latency</text>
+  </g>
+
+  <!-- Connectors to SQLite Store -->
+  <g stroke="#6366f1" stroke-width="2" opacity="0.6">
+    <line x1="165" y1="330" x2="400" y2="370" />
+    <line x1="450" y1="330" x2="450" y2="370" />
+    <line x1="735" y1="330" x2="500" y2="370" />
+  </g>
+
+  <!-- BOTTOM LAYER: Local SQLite Relational Index Store -->
+  <g transform="translate(40, 370)">
+    <rect width="820" height="120" rx="12" fill="url(#cardBg)" stroke="#475569" stroke-width="1.5" filter="url(#shadow)" />
+    
+    <rect x="20" y="20" width="40" height="40" rx="8" fill="#a855f7" opacity="0.2" />
+    <rect x="28" y="26" width="24" height="8" rx="2" fill="#c084fc" />
+    <rect x="28" y="36" width="24" height="8" rx="2" fill="#c084fc" />
+    <rect x="28" y="46" width="24" height="8" rx="2" fill="#c084fc" />
+
+    <text x="72" y="40" class="title">Local SQLite Intelligence Index (.code-intelligence/index.db)</text>
+    <text x="72" y="58" class="subtitle">Fully parameterized SQL • Cascade-deleted transactions • Interned reference dictionary (Schema v4)</text>
+
+    <!-- Table Chips -->
+    <g transform="translate(72, 74)">
+      <rect width="70" height="22" rx="6" fill="#1e1b4b" stroke="#4f46e5" stroke-width="1" />
+      <text x="35" y="15" class="tag" text-anchor="middle">files</text>
+
+      <rect x="80" width="86" height="22" rx="6" fill="#1e1b4b" stroke="#4f46e5" stroke-width="1" />
+      <text x="123" y="15" class="tag" text-anchor="middle">symbols</text>
+
+      <rect x="176" width="116" height="22" rx="6" fill="#1e1b4b" stroke="#4f46e5" stroke-width="1" />
+      <text x="234" y="15" class="tag" text-anchor="middle">relationships</text>
+
+      <rect x="302" width="104" height="22" rx="6" fill="#1e1b4b" stroke="#4f46e5" stroke-width="1" />
+      <text x="354" y="15" class="tag" text-anchor="middle">references</text>
+
+      <rect x="416" width="84" height="22" rx="6" fill="#1e1b4b" stroke="#4f46e5" stroke-width="1" />
+      <text x="458" y="15" class="tag" text-anchor="middle">imports</text>
+
+      <rect x="510" width="84" height="22" rx="6" fill="#1e1b4b" stroke="#4f46e5" stroke-width="1" />
+      <text x="552" y="15" class="tag" text-anchor="middle">exports</text>
+
+      <rect x="604" width="134" height="22" rx="6" fill="#1e1b4b" stroke="#4f46e5" stroke-width="1" />
+      <text x="671" y="15" class="tag" text-anchor="middle">reference_names</text>
+    </g>
+  </g>
+</svg>

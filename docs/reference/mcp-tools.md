@@ -1,160 +1,131 @@
-# MCP Tools
+# MCP Tools Specification
 
-The server exposes fourteen tools, each validating its arguments with a zod schema that doubles as its
-JSON Schema `inputSchema`. Eleven are read-only and wrap the search, navigation, context and graph
-layers directly. Three edit files and reindex automatically.
+Codebrain MCP exposes **fourteen schema-validated tools** over standard JSON-RPC 2.0 stdio. Every tool strictly validates its arguments with a Zod schema that doubles as its published JSON Schema.
 
-Results carry locations, names and signatures — never file contents.
+<div class="custom-banner">
+  <div class="custom-banner-icon">🛠️</div>
+  <div class="custom-banner-content">
+    <h4>14 Production MCP Tools</h4>
+    <p>11 Read-Only structural query tools and 3 Safe Edit mutation tools designed specifically for AI coding agents.</p>
+  </div>
+</div>
 
-## Read-only tools
+---
 
-### search_symbols
+## Tool Category Overview
 
-Find symbols by name. Returns id, kind, location and signature for each match, ranked exact then prefix
-then substring.
+| Category | Tools | Description |
+| :--- | :--- | :--- |
+| **Search (2)** | `search_symbols`, `search_code` | Sub-millisecond symbol name lookup and ReDoS-isolated fulltext search. |
+| **Navigation (5)** | `get_symbol`, `get_file_structure`, `find_definition`, `find_references`, `get_callers`, `get_callees` | AST hierarchy, callers, callees, definitions, and cross-file references. |
+| **Context (1)** | `get_symbol_context` | Comprehensive 360-degree context for a symbol in a single tool call. |
+| **Module Graph (2)** | `get_dependencies`, `get_dependents` | Project-wide import/export graph, external npm packages, and barrel files. |
+| **Safe Edits (3)** | `apply_patch`, `replace_symbol`, `rename_symbol` | Atomic, verified file modifications with automatic incremental reindexing. |
 
-| Argument          | Type                                                              |
-| ----------------- | ----------------------------------------------------------------- |
-| `query`           | `string` (required)                                               |
-| `match`           | `"exact"` \| `"prefix"` \| `"substring"`                          |
-| `case_sensitive`  | `boolean`                                                         |
-| `kinds`           | `array` of symbol kinds                                           |
-| `languages`       | `array` of `"javascript"` \| `"jsx"` \| `"typescript"` \| `"tsx"` |
-| `path_contains`   | `string` (substring match against the POSIX path)                 |
-| `exported_only`   | `boolean`                                                         |
-| `exclude_ambient` | `boolean` (drop `.d.ts` and `declare` symbols)                    |
-| `limit`           | `integer` 1–500                                                   |
+---
 
-### search_code
+## 1. Search Tools
 
-Search file contents for literal text or a regular expression. Every match is annotated with the symbol
-that encloses it.
+### `search_symbols`
+Finds declarations across the project by name with prioritized exact, prefix, and substring ranking.
 
-| Argument               | Type                     |
-| ---------------------- | ------------------------ |
-| `query`                | `string` (required)      |
-| `is_regex`             | `boolean`                |
-| `case_sensitive`       | `boolean`                |
-| `languages`            | `array` of language ids  |
-| `path_contains`        | `string`                 |
-| `limit`                | `integer` 1–500          |
-| `max_matches_per_file` | `integer` (cap per file) |
-| `context_lines`        | `integer` 0–10           |
-| `time_budget_ms`       | `integer` (positive)     |
+**Parameters:**
+| Field | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `query` | `string` | **Yes** | Symbol name or query substring. |
+| `match` | `"exact" \| "prefix" \| "substring"` | No | Ranking match strategy (defaults to ranked sequence). |
+| `kinds` | `SymbolKind[]` | No | Restrict to specific kinds (`function`, `class`, `interface`, etc.). |
+| `languages` | `LanguageId[]` | No | Restrict to `javascript`, `jsx`, `typescript`, or `tsx`. |
+| `path_contains` | `string` | No | Substring filter on POSIX file path. |
+| `exported_only` | `boolean` | No | Restrict to public module exports. |
+| `exclude_ambient` | `boolean` | No | Drop `.d.ts` and ambient declarations. |
+| `limit` | `number` | No | Maximum returned symbols (1–500, default: 50). |
 
-### get_symbol
+---
 
-Return the full row for a symbol id: kind, location, parent, signature, export kind.
+### `search_code`
+Searches file contents for literal strings or regex patterns, annotating every match with its innermost enclosing AST symbol.
 
-| Argument | Type     |
-| -------- | -------- |
-| `id`     | `string` |
+**Parameters:**
+| Field | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `query` | `string` | **Yes** | Search pattern or text string. |
+| `is_regex` | `boolean` | No | When `true`, evaluates query as regular expression. |
+| `case_sensitive` | `boolean` | No | Case sensitivity flag (default: `false`). |
+| `languages` | `LanguageId[]` | No | Filter by file languages. |
+| `path_contains` | `string` | No | Substring path filter. |
+| `limit` | `number` | No | Total match limit (1–500, default: 100). |
+| `max_matches_per_file` | `number` | No | Max matches per individual file. |
+| `context_lines` | `number` | No | Number of surrounding lines to return (0–10). |
+| `time_budget_ms` | `number` | No | Worker execution timeout (default: 500ms). |
 
-### get_file_structure
+---
 
-Return the symbols of a file as a tree: top-level declarations with their members nested beneath them.
+## 2. Navigation & Context Tools
 
-| Argument | Type     |
-| -------- | -------- |
-| `path`   | `string` |
+### `get_symbol`
+Retrieves full metadata for a given symbol ID.
 
-### find_definition
+```json
+// Example Response:
+{
+  "id": "src/services/user.ts#class:UserService",
+  "name": "UserService",
+  "kind": "class",
+  "file_path": "src/services/user.ts",
+  "start_line": 14,
+  "end_line": 86,
+  "signature": "export class UserService implements IUserService",
+  "export_kind": "named"
+}
+```
 
-Where a symbol is declared: its file, lines and signature, resolved by symbol id.
+---
 
-| Argument | Type     |
-| -------- | -------- |
-| `id`     | `string` |
+### `get_symbol_context`
+Provides a complete 360-degree context for a symbol in a single tool call:
+- **Declaration:** Location, signature, docstrings.
+- **Hierarchy:** Parent class/module and child member methods.
+- **Call Graph:** Who calls this symbol (`callers`) and what it invokes (`callees`).
+- **References:** Semantic occurrences across the repository.
+- **Neighborhood:** Module imports and dependents.
 
-### find_references
+---
 
-Every indexed occurrence of a symbol, definition first: where it is declared and where it is used, with
-the enclosing symbol of each use.
+### `get_file_structure`
+Returns the symbol tree of a file: top-level declarations with their nested member methods and properties.
 
-| Argument | Type     |
-| -------- | -------- |
-| `id`     | `string` |
+---
 
-### get_callers
+### `find_definition` & `find_references`
+- `find_definition`: Exact file path and line coordinates where a symbol is declared.
+- `find_references`: All semantic occurrences of a symbol across the project.
 
-The symbols whose bodies call a symbol, with where each call happens and how confidently it resolved.
+---
 
-| Argument | Type     |
-| -------- | -------- |
-| `id`     | `string` |
+### `get_callers` & `get_callees`
+- `get_callers`: Functions/methods that invoke the target symbol, annotated with confidence (`certain` vs `resolved`).
+- `get_callees`: Functions and constructors invoked from inside the symbol body.
 
-### get_callees
+---
 
-The symbols a symbol calls, with where each call happens. Unresolved calls are named honestly.
+## 3. Module Graph Tools
 
-| Argument | Type     |
-| -------- | -------- |
-| `id`     | `string` |
+### `get_dependencies`
+Returns all files and external npm packages imported by a file, categorized by target.
 
-### get_dependencies
+### `get_dependents`
+Returns all internal files and re-exporting barrel files (`export * from './mod'`) that import the target file.
 
-The modules a file imports, grouped by target: internal files by path, packages by specifier, plus the
-names each import binds.
+---
 
-| Argument | Type     |
-| -------- | -------- |
-| `path`   | `string` |
+## 4. Safe Edit Tools
 
-### get_dependents
+### `apply_patch`
+Applies exact ordered string replacements to a file. Refuses patches if the target text does not match or matches more than once.
 
-The files that import a module, and the barrels that re-export from it.
+### `replace_symbol`
+Slices directly into a symbol declaration using index-recorded UTF-16 code unit offsets, completely replacing its source.
 
-| Argument | Type     |
-| -------- | -------- |
-| `path`   | `string` |
-
-### get_symbol_context
-
-A symbol's working context in one call: what it is, what contains it and what it contains, how heavily
-it is used and where, who calls it, what it calls, and what its file imports and is imported by. Every
-list is capped; `total` fields say how much was left out.
-
-| Argument | Type     |
-| -------- | -------- |
-| `id`     | `string` |
-
-## Edit tools
-
-### apply_patch
-
-Edit a file with exact text replacements. Each edit replaces the first occurrence of `old_text` in the
-**current** file content with `new_text`, applied in order; a non-matching or ambiguous `old_text`
-refuses the whole call, so a patch cannot silently corrupt. The index refreshes automatically.
-
-| Argument | Type                                   |
-| -------- | -------------------------------------- |
-| `path`   | `string` (project-relative POSIX path) |
-| `edits`  | `array` of `{ old_text, new_text }`    |
-
-### replace_symbol
-
-Replace a symbol's whole declaration with `new_source`, spliced in at the exact source range the index
-recorded. Supply the complete replacement text for the declaration.
-
-| Argument     | Type     |
-| ------------ | -------- |
-| `id`         | `string` |
-| `new_source` | `string` |
-
-### rename_symbol
-
-Rename a symbol everywhere the index resolved it: its declaration and every reference, across files.
-Uses only the new name; a file that drifted from the index refuses the whole rename. Occurrences the
-index could not resolve are left alone.
-
-| Argument   | Type     |
-| ---------- | -------- |
-| `id`       | `string` |
-| `new_name` | `string` |
-
-## Error handling
-
-Business failures — a missing symbol id, an unindexed file, a patch that does not apply — are raised as
-`tool_error` and reported by the server as a **failed tool result** (`isError: true`), so the text
-reaches the model and it can recover. Protocol-level mistakes (malformed JSON, an unknown method, a
-schema-invalid argument) are answered with the matching JSON-RPC error code.
+### `rename_symbol`
+Performs atomic, cross-file refactoring: updates the declaration, all resolved reference occurrences, and import/export bindings.

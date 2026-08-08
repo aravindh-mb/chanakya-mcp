@@ -22,6 +22,7 @@ import type {
   find_definition_result,
   find_references_result,
 } from './types.js';
+import type { code_reference } from '../model/module_graph.js';
 
 export interface navigation_options {
   readonly store: index_store;
@@ -35,7 +36,30 @@ export function find_definition(options: navigation_options, symbol_id: string):
 /** Every indexed occurrence of a symbol, definition included. */
 export function find_references(options: navigation_options, symbol_id: string): find_references_result {
   const store = options.store;
-  const references = store.get_references_to(symbol_id);
+
+  // Get the symbol we're searching for (to extract its name)
+  const target_symbol = store.get_symbol(symbol_id);
+  if (target_symbol === undefined) {
+    return { references: [] };
+  }
+
+  // Get exact resolved references (where symbol_id matches)
+  const exact_references = store.get_references_to(symbol_id);
+
+  // ALSO get all references by name (resolved or not) to catch:
+  // - Unresolved cross-file uses
+  // - Type annotation uses
+  // - Import/export aliases
+  // - All semantic variations of the name
+  const all_by_name = store.find_references_by_name(target_symbol.name);
+
+  // Combine: exact matches + all name matches (but deduplicate by location)
+  const location_key = (ref: code_reference) => `${ref.file_path}:${ref.line}:${ref.column}`;
+  const seen = new Set(exact_references.map(location_key));
+  const references = [
+    ...exact_references,
+    ...all_by_name.filter((ref) => !seen.has(location_key(ref))),
+  ];
 
   const enclosing_ids = [
     ...new Set(
@@ -52,6 +76,7 @@ export function find_references(options: navigation_options, symbol_id: string):
       line: item.line,
       column: item.column,
       is_definition: item.is_definition,
+      resolved: item.symbol_id === symbol_id,
       ...(item.enclosing_symbol_id === undefined
         ? {}
         : { enclosing_symbol: symbols_by_id.get(item.enclosing_symbol_id) }),

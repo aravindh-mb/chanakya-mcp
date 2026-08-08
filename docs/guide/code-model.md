@@ -1,50 +1,81 @@
-# Code Model & Extraction
+# Code Model & AST Extraction
 
-Between the grammar and the index sits a small, language-independent model. It is **not** a unified AST:
-it does not try to represent every construct in every language, only the facts an agent asks for.
+Between the raw Tree-Sitter grammar and the SQLite index sits a language-independent code intelligence model. It does not attempt to represent every syntactic token—instead, it extracts the exact facts and relationships that AI coding agents require.
 
-| Type             | What it records                                                                  |
-| ---------------- | -------------------------------------------------------------------------------- |
-| `code_file`      | path, language, size, content hash, package (for monorepos)                      |
-| `code_symbol`    | name, kind, location, parent, signature, export kind                             |
-| `relationship`   | `contains`, `imports`, `exports`, `calls`, `references`, `extends`, `implements` |
-| `code_import`    | specifier, imported/local name, resolved path, internal vs package               |
-| `code_export`    | exported name, local name, re-export source                                      |
-| `code_reference` | every occurrence of a name, with its enclosing symbol                            |
+<div class="custom-banner">
+  <div class="custom-banner-icon">🧩</div>
+  <div class="custom-banner-content">
+    <h4>Language-Agnostic Relational Model</h4>
+    <p>Decoupled from specific compiler backends. The normalization layer maps concrete syntax nodes into a uniform, queryable graph.</p>
+  </div>
+</div>
 
-Symbol kinds: `function`, `class`, `method`, `interface`, `type`, `variable`, `constant`, `enum`, `module`.
+---
 
-Two rules shape everything here:
+## The Normalized Data Entities
 
-**Never invent a relationship.** When a call target cannot be resolved, the edge is stored with the name
-that was actually written and _no_ target id, rather than pointed at a plausible-looking symbol. Edges
-carry a confidence of `certain` (derived from syntax alone) or `resolved` (followed across an import).
-There is deliberately no "guessed" level. An agent acting on a fabricated `calls` edge edits the wrong
-function, so a missing edge is much cheaper than a wrong one.
+The code model defines six core record types:
 
-**Symbol ids exclude line numbers.** An id is `<file>#<kind>:<container.path>`, for example
-`src/user.ts#method:user_service.create_user`. Editing one function therefore does not change the id of
-every symbol below it, which is what lets incremental indexing diff a file instead of rewriting it.
+| Entity | Attributes Recorded | Description |
+| :--- | :--- | :--- |
+| `code_file` | `path`, `language`, `size`, `hash`, `package` | File metadata and package affiliation (for monorepos). |
+| `code_symbol` | `id`, `name`, `kind`, `location`, `parent_id`, `signature`, `export_kind` | Core declaration (function, class, method, etc.). |
+| `relationship` | `source_id`, `target_id`, `target_name`, `kind`, `confidence` | Graph edge connecting two symbols or files. |
+| `code_import` | `specifier`, `imported_name`, `local_name`, `resolved_path`, `is_package` | Static ES module or CommonJS import statement. |
+| `code_export` | `name`, `local_name`, `source_path`, `is_reexport` | Exported identifier or re-exported barrel entry. |
+| `code_reference`| `name`, `file_path`, `location`, `enclosing_symbol_id` | Every semantic occurrence of an identifier. |
 
-## Symbol extraction
+---
 
-Every declaration becomes a symbol with its kind, 1-based location, containment parent, export kind,
-ambient flag, and a one-line signature with the body stripped
-(`async create_user(u: user): Promise<void>`). Containment produces `contains` edges, the one
-relationship kind that is certain from syntax alone.
+## 9 Standard Symbol Kinds
 
-Three judgement calls are worth stating, because they shape what you get back:
+```typescript
+type SymbolKind =
+  | 'function'   // Standalone function, arrow function, generator
+  | 'class'      // ES6 class, abstract class
+  | 'method'     // Class method, getter, setter
+  | 'interface'  // TypeScript interface definition
+  | 'type'       // Type alias (type Foo = ...)
+  | 'variable'   // Top-level mutable variable (let, var)
+  | 'constant'   // Top-level immutable constant (const)
+  | 'enum'       // TypeScript enum declaration
+  | 'module';    // Namespace, ambient module
+```
 
-**`const f = () => {}` is recorded as a function, not a constant.** It is the dominant declaration style
-in React and modern TypeScript, and someone searching for a function has to find it.
+---
 
-**Function-local data variables are not indexed.** Names like `stack`, `index` or `base` are meaningless
-to search for and would bury real results — on this repository, excluding them took the constant count
-from 312 to 37. Functions and classes declared inside a function _are_ kept, since a named callable is
-worth looking up however it is scoped.
+## 7 Relational Graph Edge Kinds
 
-**Nothing is named by guesswork.** A destructuring binding (`const { a, b } = obj`) binds several names
-at once, so no symbol is recorded rather than one invented name; the bindings stay visible as references.
-Class and interface _properties_ are not symbols either, because the model has no kind for them and
-inventing one would be a deviation. `export default function () {}` is recorded under the name `default`,
-which is how consumers actually address it.
+```typescript
+type RelationshipKind =
+  | 'contains'    // Parent-child AST nesting (Class -> Method, Module -> Function)
+  | 'imports'     // File pulls in symbol from another module
+  | 'exports'     // Module exposes symbol to consumers
+  | 'calls'       // Invocation edge (A calls B)
+  | 'references'  // General semantic usage or type annotation
+  | 'extends'     // Class inheritance or interface extension
+  | 'implements'; // Class implements interface contract
+```
+
+---
+
+## Core Extraction Principles
+
+### 1. Zero Guesswork — Confidence Tiers
+Codebrain MCP never fabricates a relationship. Edges carry strict confidence ratings:
+- **`certain`**: Derived unambiguously from local syntax (e.g., `contains` parent-child relationships, explicit class method calls).
+- **`resolved`**: Followed confidently across an explicit ES import binding.
+- **Unresolved Calls**: When a call target cannot be determined statically (e.g., dynamic dispatch or ambiguous naming), the edge is stored with `target_name` and `target_id: null`. An agent never receives a misleading fabricated target.
+
+### 2. Stable Symbol Identifiers
+Symbol IDs are constructed without line numbers:
+```text
+<file_path>#<kind>:<container.path>
+Example: src/services/user.ts#method:UserService.create_user
+```
+By excluding line numbers from symbol IDs, adding or deleting lines elsewhere in a file does not invalidate IDs across the rest of the codebase. This allows incremental indexing to diff modified files efficiently.
+
+### 3. Pragmatic Extraction Rules
+- **Arrow Functions as Functions:** `const handleRequest = () => {}` is recorded as a `function`, matching modern React and TypeScript conventions.
+- **Exclusion of Function-Local Noise:** Transient local variables (`i`, `temp`, `stack`, `curr`) inside function bodies are excluded from the symbol index to prevent cluttering search results. Nested functions and classes declared inside functions are preserved.
+- **Anonymous Default Exports:** `export default function() {}` is indexed under the canonical name `default`.
