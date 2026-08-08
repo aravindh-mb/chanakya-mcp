@@ -1,0 +1,74 @@
+{
+  "name": "@code-intelligence/mcp",
+  "version": "0.1.0",
+  "description": "Local MCP server that gives AI coding agents deep structural knowledge of a JavaScript/TypeScript codebase.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "code-intelligence",
+    "typescript",
+    "javascript",
+    "tree-sitter",
+    "static-analysis",
+    "claude-code",
+    "cursor"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "bin": {
+    "code-intelligence-mcp": "./dist/cli/main.js"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "start": "node ./dist/cli/main.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "pnpm run typecheck && pnpm run lint && pnpm run test",
+    "prepublishOnly": "pnpm run build"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@types/node": "^22.10.2",
+    "@vitest/coverage-v8": "^2.1.8",
+    "eslint": "^9.17.0",
+    "prettier": "^3.4.2",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.1",
+    "vitest": "^2.1.8"
+  },
+  "packageManager": "pnpm@10.24.0",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

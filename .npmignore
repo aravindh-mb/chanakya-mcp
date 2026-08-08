@@ -1,0 +1,16 @@
+# `files` in package.json is the source of truth for what gets published.
+# This file exists as a second line of defence.
+
+src/
+tests/
+benchmarks/
+coverage/
+.github/
+.code-intelligence/
+
+*.config.ts
+eslint.config.js
+tsconfig.json
+.prettierrc.json
+.prettierignore
+pnpm-lock.yaml
