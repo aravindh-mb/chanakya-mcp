@@ -71,6 +71,11 @@ export {
   type index_project_result,
 } from './indexer/index_project.js';
 export {
+  resolve_project_graph,
+  type resolve_project_graph_options,
+  type resolve_project_graph_result,
+} from './indexer/resolve_project_graph.js';
+export {
   detect_changes,
   normalize_modified_time,
   type change_set,
@@ -113,10 +118,42 @@ export {
 export { create_empty_analysis, type code_file, type file_analysis } from './model/file.js';
 
 export {
+  find_definition,
+  find_references,
+  find_callers,
+  find_callees,
+  type navigation_options,
+} from './navigation/navigation.js';
+export {
+  type callee_hit,
+  type caller_hit,
+  type find_callees_result,
+  type find_callers_result,
+  type find_definition_result,
+  type find_references_result,
+  type reference_hit,
+} from './navigation/types.js';
+
+export {
   extract_symbols,
   type extract_symbols_options,
   type extracted_symbols,
 } from './extract/symbol_extractor.js';
+export {
+  extract_file,
+  type extract_file_options,
+  type extracted_file,
+} from './extract/extract_file.js';
+export { extract_imports, type extract_imports_options } from './extract/import_extractor.js';
+export { extract_exports, type extract_exports_options } from './extract/export_extractor.js';
+export { extract_references, type extract_references_options } from './extract/reference_extractor.js';
+export { extract_calls, type extract_calls_options } from './extract/call_extractor.js';
+export {
+  build_file_index,
+  resolve_module_specifier,
+  type file_index,
+  type resolve_module_specifier_options,
+} from './extract/module_resolution.js';
 export { build_signature, MAX_SIGNATURE_LENGTH } from './extract/signature.js';
 export { DEFAULT_EXPORT_NAME, read_declaration_name } from './extract/declaration_name.js';
 

@@ -110,9 +110,20 @@ interface prepared_statements {
   readonly select_symbols_by_name: Statement;
   readonly select_symbols_by_file: Statement;
   readonly select_relationships_from: Statement;
+  readonly select_relationships_to: Statement;
+  readonly select_unresolved_calls: Statement;
+  readonly select_all_imports: Statement;
+  readonly select_all_exports: Statement;
+  readonly select_symbols_by_parent: Statement;
+  readonly select_file_paths: Statement;
   readonly select_imports_by_file: Statement;
   readonly select_exports_by_file: Statement;
   readonly select_references_by_name: Statement;
+  readonly select_references_to: Statement;
+  readonly select_unresolved_references: Statement;
+  readonly update_edge_target: Statement;
+  readonly update_import_resolved_path: Statement;
+  readonly update_reference_target: Statement;
   readonly set_metadata: Statement;
   readonly get_metadata: Statement;
 }
@@ -236,6 +247,82 @@ export class index_store {
   get_relationships_from(from_id: string): readonly relationship[] {
     const rows = this.#statements.select_relationships_from.all(from_id) as relationship_row[];
     return rows.map(to_relationship);
+  }
+
+  get_relationships_to(to_id: string): readonly relationship[] {
+    const rows = this.#statements.select_relationships_to.all(to_id) as relationship_row[];
+    return rows.map(to_relationship);
+  }
+
+  /**
+   * Call edges whose target is still unknown — the input to the cross-file
+   * resolution pass, which follows imports to point them at real symbols.
+   */
+  get_unresolved_call_edges(): readonly relationship[] {
+    const rows = this.#statements.select_unresolved_calls.all() as relationship_row[];
+    return rows.map(to_relationship);
+  }
+
+  get_all_imports(): readonly code_import[] {
+    const rows = this.#statements.select_all_imports.all() as import_row[];
+    return rows.map(to_code_import);
+  }
+
+  get_all_exports(): readonly code_export[] {
+    const rows = this.#statements.select_all_exports.all() as export_row[];
+    return rows.map(to_code_export);
+  }
+
+  get_symbols_by_parent(parent_id: string): readonly code_symbol[] {
+    const rows = this.#statements.select_symbols_by_parent.all(parent_id) as symbol_row[];
+    return rows.map(to_code_symbol);
+  }
+
+  get_symbols_by_ids(ids: readonly string[]): readonly code_symbol[] {
+    if (ids.length === 0) {
+      return [];
+    }
+    const placeholders = ids.map(() => '?').join(', ');
+    const rows = this.#db
+      .prepare(`SELECT * FROM symbols WHERE id IN (${placeholders})`)
+      .all(...ids) as symbol_row[];
+    return rows.map(to_code_symbol);
+  }
+
+  /** Every indexed path, as POSIX paths relative to the project root. */
+  list_file_paths(): readonly string[] {
+    const rows = this.#statements.select_file_paths.all() as Array<{ file_path: string }>;
+    return rows.map((row) => row.file_path);
+  }
+
+  /** Point an unresolved edge at its resolved target, upgrading confidence. */
+  set_edge_target(edge_id: string, to_id: string): void {
+    this.#statements.update_edge_target.run(to_id, edge_id);
+  }
+
+  /** Record where an import's specifier resolved to. */
+  set_import_resolved_path(import_id: string, resolved_path: string): void {
+    this.#statements.update_import_resolved_path.run(resolved_path, import_id);
+  }
+
+  /** Point an unresolved reference at the symbol it turned out to name. */
+  set_reference_target(reference_id: string, symbol_id: string): void {
+    this.#statements.update_reference_target.run(symbol_id, reference_id);
+  }
+
+  /** Every occurrence pointing at a symbol, definition first. */
+  get_references_to(symbol_id: string): readonly code_reference[] {
+    const rows = this.#statements.select_references_to.all(symbol_id) as reference_row[];
+    return rows.map(to_code_reference);
+  }
+
+  /**
+   * References that are uses (not declarations) with no resolved target — the
+   * cross-file names the graph resolution pass can follow through imports.
+   */
+  get_unresolved_references(): readonly code_reference[] {
+    const rows = this.#statements.select_unresolved_references.all() as reference_row[];
+    return rows.map(to_code_reference);
   }
 
   get_imports_in_file(file_path: string): readonly code_import[] {
@@ -588,11 +675,30 @@ function prepare_statements(db: database_handle): prepared_statements {
     ),
     select_symbols_by_file: db.prepare('SELECT * FROM symbols WHERE file_path = ? ORDER BY start_line'),
     select_relationships_from: db.prepare('SELECT * FROM relationships WHERE from_id = ?'),
+    select_relationships_to: db.prepare('SELECT * FROM relationships WHERE to_id = ?'),
+    select_unresolved_calls: db.prepare(
+      "SELECT * FROM relationships WHERE kind = 'calls' AND to_id IS NULL",
+    ),
+    select_all_imports: db.prepare('SELECT * FROM imports'),
+    select_all_exports: db.prepare('SELECT * FROM exports'),
+    select_symbols_by_parent: db.prepare('SELECT * FROM symbols WHERE parent_id = ? ORDER BY start_line'),
+    select_file_paths: db.prepare('SELECT file_path FROM files ORDER BY file_path'),
     select_imports_by_file: db.prepare('SELECT * FROM imports WHERE file_path = ? ORDER BY line'),
     select_exports_by_file: db.prepare('SELECT * FROM exports WHERE file_path = ? ORDER BY line'),
     select_references_by_name: db.prepare(
       `SELECT * FROM ${REFERENCES_TABLE} WHERE name = ? ORDER BY file_path, line LIMIT ?`,
     ),
+    select_references_to: db.prepare(
+      `SELECT * FROM ${REFERENCES_TABLE} WHERE symbol_id = ? ORDER BY is_definition DESC, file_path, line, column`,
+    ),
+    select_unresolved_references: db.prepare(
+      `SELECT * FROM ${REFERENCES_TABLE} WHERE symbol_id IS NULL AND is_definition = 0`,
+    ),
+    update_edge_target: db.prepare(
+      "UPDATE relationships SET to_id = ?, confidence = 'resolved' WHERE id = ?",
+    ),
+    update_import_resolved_path: db.prepare('UPDATE imports SET resolved_path = ? WHERE id = ?'),
+    update_reference_target: db.prepare(`UPDATE ${REFERENCES_TABLE} SET symbol_id = ? WHERE id = ?`),
     set_metadata: db.prepare('INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)'),
     get_metadata: db.prepare('SELECT value FROM metadata WHERE key = ?'),
   };

@@ -14,7 +14,8 @@
  * unreadable file in a 10,000 file repository must not cost the other 9,999.
  */
 
-import { extract_symbols } from '../extract/symbol_extractor.js';
+import { extract_file } from '../extract/extract_file.js';
+import { build_file_index, type file_index } from '../extract/module_resolution.js';
 import { describe_unknown_error } from '../core/errors.js';
 import { hash_content } from '../core/hash.js';
 import type { logger } from '../core/logger.js';
@@ -25,6 +26,7 @@ import type { scan_options, scanned_file } from '../scanner/types.js';
 import { METADATA_KEYS } from '../store/schema.js';
 import type { index_store } from '../store/index_store.js';
 import { detect_changes, normalize_modified_time } from './change_detection.js';
+import { resolve_project_graph } from './resolve_project_graph.js';
 
 /**
  * Files written per transaction. Large enough to amortize commits, small enough
@@ -81,6 +83,7 @@ export async function index_project(options: index_project_options): Promise<ind
   const scan = await scan_project({ root_path, ...options.scan });
   const stored = options.force === true ? new Map() : store.list_file_stamps();
   const changes = detect_changes({ stored, scanned: scan.files });
+  const files = build_file_index(scan.files);
 
   log?.debug(
     `scan found ${scan.files.length} files: ${changes.added.length} new, ` +
@@ -115,7 +118,7 @@ export async function index_project(options: index_project_options): Promise<ind
 
   for (let offset = 0; offset < work.length; offset += batch_size) {
     const batch = work.slice(offset, offset + batch_size);
-    const writes = await analyze_batch(batch, stored, stats, failures, log);
+    const writes = await analyze_batch(batch, stored, stats, failures, log, files);
 
     store.transaction(() => {
       for (const analysis of writes) {
@@ -128,6 +131,11 @@ export async function index_project(options: index_project_options): Promise<ind
 
   // Only worth the cost when something actually moved.
   if (stats.files_added + stats.files_updated + changes.deleted.length > 0) {
+    // With the per-file graph stored, follow imports across files and point
+    // every unresolved call edge at the symbol it actually calls.
+    resolve_project_graph(
+      options.logger === undefined ? { store } : { store, logger: options.logger },
+    );
     store.optimize();
   }
 
@@ -159,12 +167,13 @@ async function analyze_batch(
   stats: mutable_stats,
   failures: index_failure[],
   log: logger | undefined,
+  files: file_index,
 ): Promise<file_analysis[]> {
   const writes: file_analysis[] = [];
 
   for (const item of batch) {
     try {
-      const analysis = await analyze_file(item.file);
+      const analysis = await analyze_file(item.file, files);
       stats.files_parsed += 1;
 
       // Second-stage check: the fingerprint said "maybe", the hash decides. A
@@ -196,10 +205,19 @@ async function analyze_batch(
   return writes;
 }
 
-/** Parse and extract one file into the shape the store writes. */
-export async function analyze_file(file: scanned_file): Promise<file_analysis> {
+/**
+ * Parse and extract one file into the shape the store writes.
+ *
+ * `files` is the set of indexable files the scan found; it lets the import
+ * extractor resolve relative specifiers immediately. The graph resolution pass
+ * later catches anything it could not.
+ */
+export async function analyze_file(file: scanned_file, files?: file_index): Promise<file_analysis> {
   const parsed = await parse_file({ file_path: file.file_path });
-  const extracted = extract_symbols({ parsed, relative_path: file.relative_path });
+  const extracted =
+    files === undefined
+      ? extract_file({ parsed, relative_path: file.relative_path })
+      : extract_file({ parsed, relative_path: file.relative_path, files });
 
   const record: code_file = {
     file_path: file.relative_path,
@@ -218,9 +236,8 @@ export async function analyze_file(file: scanned_file): Promise<file_analysis> {
     file: record,
     symbols: extracted.symbols,
     relationships: extracted.relationships,
-    // Populated once import, export and reference extraction lands.
-    imports: [],
-    exports: [],
-    references: [],
+    imports: extracted.imports,
+    exports: extracted.exports,
+    references: extracted.references,
   };
 }
