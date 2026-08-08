@@ -53,6 +53,7 @@ function new_server(): mcp_server {
       files_failed: 0,
       failures: [],
       duration_ms: 0,
+      timings: { scan_ms: 0, analyze_ms: 0, write_ms: 0, graph_ms: 0, total_ms: 0 },
     }),
   });
 }

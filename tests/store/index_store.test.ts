@@ -133,6 +133,7 @@ describe('index_store schema', () => {
       references: 0,
       imports: 0,
       exports: 0,
+      reference_names: 0,
     });
   });
 
@@ -152,6 +153,7 @@ describe('index_store writing', () => {
       references: 1,
       imports: 1,
       exports: 1,
+      reference_names: 1,
     });
   });
 
@@ -230,6 +232,38 @@ describe('index_store replacing a file', () => {
 
     expect(store.count().files).toBe(1);
     expect(store.count().symbols).toBe(2);
+    // Reindexing the same content does not grow the name dictionary.
+    expect(store.count().references).toBe(1);
+    expect(store.count().reference_names).toBe(1);
+  });
+
+  it('shares one dictionary row across files that use the same name', () => {
+    store.write_file_analysis(make_analysis());
+    const other = make_analysis();
+    store.write_file_analysis({
+      ...other,
+      file: { ...other.file, file_path: 'src/other.ts', absolute_path: '/project/src/other.ts' },
+      symbols: [],
+      relationships: [],
+      imports: [],
+      exports: [],
+      references: [
+        {
+          id: 'ref-2',
+          file_path: 'src/other.ts',
+          name: 'create_user',
+          symbol_id: undefined,
+          enclosing_symbol_id: undefined,
+          line: 1,
+          column: 1,
+          is_definition: false,
+        },
+      ],
+    });
+
+    expect(store.count().references).toBe(2);
+    expect(store.count().reference_names).toBe(1);
+    expect(store.find_references_by_name('create_user')).toHaveLength(2);
   });
 
   it('removes symbols that no longer exist in the file', () => {
@@ -253,6 +287,11 @@ describe('index_store replacing a file', () => {
       references: 0,
       imports: 0,
       exports: 0,
+      // The name dictionary is a vocabulary cache, not a per-file row, so it
+      // deliberately survives the cascade: pruning it on every delete would
+      // cost a scan of every reference for a cache that is bounded by the
+      // number of distinct identifiers in the codebase.
+      reference_names: 1,
     });
   });
 

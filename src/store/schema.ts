@@ -25,8 +25,14 @@
  * v3 drops the `symbol_ids` dictionary that v2 introduced but never read: the
  * symbol `key` comes straight from `symbols.key`, and cross-file edges resolve
  * their targets by symbol id at write time.
+ *
+ * v4 interns reference names. Every identifier occurrence is a reference, so
+ * on a large repository the same short name repeats millions of times and its
+ * string index was the single biggest object in the database. `references`
+ * now stores a `name_key` pointing into the `reference_names` dictionary, and
+ * queries join back out to the name on read.
  */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 /** Quoted because `references` is a reserved word. */
 export const REFERENCES_TABLE = '"references"';
@@ -43,6 +49,7 @@ export const TABLE_NAMES: readonly string[] = [
   'files',
   'symbols',
   'relationships',
+  'reference_names',
   'references',
   'imports',
   'exports',
@@ -103,10 +110,15 @@ CREATE TABLE IF NOT EXISTS relationships (
   line       INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS reference_names (
+  key  INTEGER PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE
+);
+
 CREATE TABLE IF NOT EXISTS "references" (
   key                    INTEGER PRIMARY KEY,
   file_id                INTEGER NOT NULL REFERENCES files(file_id) ON DELETE CASCADE,
-  name                   TEXT NOT NULL,
+  name_key               INTEGER NOT NULL REFERENCES reference_names(key),
   symbol_key             INTEGER,
   enclosing_symbol_key   INTEGER,
   line                   INTEGER NOT NULL,
@@ -153,7 +165,7 @@ CREATE INDEX IF NOT EXISTS idx_rel_kind  ON relationships(kind);
 CREATE INDEX IF NOT EXISTS idx_rel_name  ON relationships(to_name);
 CREATE INDEX IF NOT EXISTS idx_rel_file  ON relationships(file_id);
 
-CREATE INDEX IF NOT EXISTS idx_refs_name   ON "references"(name);
+CREATE INDEX IF NOT EXISTS idx_refs_name   ON "references"(name_key);
 CREATE INDEX IF NOT EXISTS idx_refs_symbol ON "references"(symbol_key);
 CREATE INDEX IF NOT EXISTS idx_refs_file   ON "references"(file_id);
 
@@ -169,11 +181,11 @@ CREATE INDEX IF NOT EXISTS idx_exports_symbol ON exports(symbol_key);
 /** Used when the stored schema version does not match `SCHEMA_VERSION`. */
 export const DROP_SCHEMA_SQL = `
 DROP TABLE IF EXISTS "references";
+DROP TABLE IF EXISTS reference_names;
 DROP TABLE IF EXISTS imports;
 DROP TABLE IF EXISTS exports;
 DROP TABLE IF EXISTS relationships;
 DROP TABLE IF EXISTS symbols;
 DROP TABLE IF EXISTS files;
-DROP TABLE IF EXISTS symbol_ids;
 DROP TABLE IF EXISTS metadata;
 `;

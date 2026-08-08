@@ -2,17 +2,20 @@
  * Reading and writing project files for edit operations, plus the checks that
  * make an edit "safe".
  *
- * Two rules hold. First, the path must stay inside the project: a relative
+ * Three rules hold. First, the path must stay inside the project: a relative
  * POSIX path is resolved against the root and verified with the containment
  * check, so a crafted `..` cannot smuggle a write out of the tree. Second, the
- * file's content on disk must still match what the index recorded — an edit
- * based on stale locations would silently clobber changes made after the last
- * index, so we refuse instead. The index refreshes on every edit (via the
- * `reindex` step), which is what keeps a second edit safe.
+ * containment check is repeated against **real paths**, so a symlink or junction
+ * inside the project that points outside cannot smuggle a write out either —
+ * the lexical check alone would accept `link/evil.ts` when `link` resolves
+ * elsewhere. Third, the file's content on disk must still match what the index
+ * recorded — an edit based on stale locations would silently clobber changes
+ * made after the last index, so we refuse instead. The index refreshes on every
+ * edit (via the `reindex` step), which is what keeps a second edit safe.
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
-import { isAbsolute, resolve } from 'node:path';
+import { realpathSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, isAbsolute, resolve } from 'node:path';
 import { hash_content } from '../core/hash.js';
 import { is_path_inside } from '../core/paths.js';
 import { tool_error } from '../mcp/errors.js';
@@ -20,7 +23,7 @@ import type { index_store } from '../store/index_store.js';
 
 /**
  * Resolve a project-relative POSIX path to an absolute native path, refusing
- * anything that escapes the project root.
+ * anything that escapes the project root, lexically or through a symlink.
  */
 export function resolve_project_path(root_path: string, file_path: string): string {
   if (isAbsolute(file_path) || file_path.split('/').includes('..')) {
@@ -30,7 +33,49 @@ export function resolve_project_path(root_path: string, file_path: string): stri
   if (!is_path_inside(root_path, absolute_path)) {
     throw new tool_error(`'${file_path}' resolves outside the project`);
   }
+  assert_real_path_inside(root_path, absolute_path);
   return absolute_path;
+}
+
+/**
+ * Re-run the containment check on real paths, so a symlink cannot smuggle the
+ * target out of the root.
+ *
+ * The candidate may not exist yet (it is about to be written), so the nearest
+ * existing ancestor is resolved instead — a symlinked directory ancestor is
+ * caught either way, which is the only direction a path can escape.
+ */
+function assert_real_path_inside(root_path: string, candidate_path: string): void {
+  const real_root = try_realpath(root_path);
+  if (real_root === undefined) {
+    // The root does not exist or is unreadable; nothing to verify against, and
+    // the lexical check above is all the defense a phantom root needs.
+    return;
+  }
+
+  let probe = candidate_path;
+  let real_probe = try_realpath(probe);
+  while (real_probe === undefined) {
+    const parent = dirname(probe);
+    if (parent === probe) {
+      // Walked up to the drive root without finding anything: nothing to verify.
+      return;
+    }
+    probe = parent;
+    real_probe = try_realpath(probe);
+  }
+
+  if (!is_path_inside(real_root, real_probe)) {
+    throw new tool_error(`'${candidate_path}' resolves outside the project through a symlink`);
+  }
+}
+
+function try_realpath(path_value: string): string | undefined {
+  try {
+    return realpathSync.native(path_value);
+  } catch {
+    return undefined;
+  }
 }
 
 /**

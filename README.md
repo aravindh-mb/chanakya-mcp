@@ -3,11 +3,14 @@
 A local [MCP](https://modelcontextprotocol.io) server that gives AI coding agents — Claude Code, Cursor,
 and any other MCP-compatible client — deep structural knowledge of a JavaScript/TypeScript codebase.
 
-> **Status: early development.** Phases 1–13 of 20 are implemented: package foundation, CLI, project
+> **Status: early development.** Phases 1–17 of 20 are implemented: package foundation, CLI, project
 > scanner, tree-sitter parsing, the normalized code model, symbol extraction, the SQLite index,
 > incremental indexing with a file watcher, lexical search, navigation, the module dependency graph,
-> the MCP server over stdio, safe + symbol-aware edit tools, and worker-thread regex safety with a
-> terminable time budget. See [Roadmap](#roadmap).
+> the MCP server over stdio, safe + symbol-aware edit tools, symbol context, and worker-thread regex
+> safety with a terminable time budget. Phase 15 (semantic search) is deliberately deferred until the
+> language-level system is solid; it will be optional and pluggable. Phases 18–20 (security, docs,
+> publishing) are partly done: security hardening is in place and documented, publishing is not.
+> See [Roadmap](#roadmap).
 
 ## Why this exists
 
@@ -234,20 +237,34 @@ repository must not cost the other 9,999.
 
 ### Measured
 
-Indexing 5,064 real files (including `node_modules`, which is not the normal case):
+On this repository (103 files, 655 symbols), index to first query:
 
-|                       |                                                 |
-| --------------------- | ----------------------------------------------- |
-| Full index            | 41 s (123 files/sec), 0 failures                |
-| Extracted             | 121,348 symbols, 48,678 relationships           |
-| Peak heap             | 57 MB — flat, files are processed one at a time |
-| Symbol lookup by name | ~0.02 ms                                        |
-| File structure read   | ~0.05 ms                                        |
-| Database size         | 147 MB                                          |
+|                       |                   |
+| --------------------- | ----------------- |
+| Full index            | 1.6 s, 0 failures |
+| Database size         | 2.0 MB            |
+| Symbol lookup by name | ~0.05 ms          |
 
-The database size is the weak number. Symbol ids embed the full file path and are repeated in
-`parent_id` and across five indexes, so long paths cost a lot. Interning paths and using integer row ids
-is the obvious fix and belongs to the performance phase; it is recorded here rather than glossed over.
+The stress case — 5,123 files including `node_modules`, which is not the normal
+case:
+
+|                   |                                          |
+| ----------------- | ---------------------------------------- |
+| Full index        | ~230 s (parse + extract dominates)       |
+| Extracted         | 122,936 symbols, 370,534 relationships   |
+| References stored | 1,995,856 — every identifier occurrence  |
+| Database size     | 256 MB (55,655 distinct reference names) |
+
+`index_project` reports a `timings` breakdown (`scan_ms`, `analyze_ms`,
+`write_ms`, `graph_ms`) so slow runs can be diagnosed instead of guessed at. On
+the stress case the split is roughly 1% scan, 80% parse/extract, 18% writes,
+2% graph resolution — tree-sitter parsing, not database work, is the cost.
+
+The database is the derived cache, and its size is dominated by the
+`references` table (one row per identifier occurrence) and its indexes. The
+name column is interned through the `reference_names` dictionary (schema v4):
+2 million references collapse to 55,655 distinct names, which is what keeps
+the index from ballooning on repositories with a lot of repetitive code.
 
 ## Incremental indexing
 
@@ -521,22 +538,24 @@ npm publish --access public
 
 ## Roadmap
 
-| Phase | Scope                     | Status                |
-| ----- | ------------------------- | --------------------- |
-| 1     | Project foundation + CLI  | Done                  |
-| 2     | Project scanner           | Done                  |
-| 3     | Tree-sitter parsing       | Done                  |
-| 4     | Normalized code model     | Done                  |
-| 5     | Symbol extraction         | Done                  |
-| 6     | SQLite index              | Done                  |
-| 7     | Incremental indexing      | Done                  |
-| 8     | Code search               | Done                  |
-| 9     | Navigation                | Done                  |
-| 10    | Relationship graph        | Done                  |
-| 11    | MCP server                | Done                  |
-| 12-13 | Safe + symbol-aware edits | Done                  |
-| 14-17 | Context, semantic, perf   | Next                  |
-| 18-20 | Security, docs, publish   | Partly (regex worker) |
+| Phase | Scope                     | Status                         |
+| ----- | ------------------------- | ------------------------------ |
+| 1     | Project foundation + CLI  | Done                           |
+| 2     | Project scanner           | Done                           |
+| 3     | Tree-sitter parsing       | Done                           |
+| 4     | Normalized code model     | Done                           |
+| 5     | Symbol extraction         | Done                           |
+| 6     | SQLite index              | Done                           |
+| 7     | Incremental indexing      | Done                           |
+| 8     | Code search               | Done                           |
+| 9     | Navigation                | Done                           |
+| 10    | Relationship graph        | Done                           |
+| 11    | MCP server                | Done                           |
+| 12-13 | Safe + symbol-aware edits | Done                           |
+| 14    | Symbol context            | Done                           |
+| 15    | Semantic search           | Deferred (optional)            |
+| 16-17 | Performance               | Done                           |
+| 18-20 | Security, docs, publish   | Security done; publish pending |
 
 ## License
 

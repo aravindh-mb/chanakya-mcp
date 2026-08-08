@@ -95,6 +95,8 @@ export interface index_counts {
   readonly references: number;
   readonly imports: number;
   readonly exports: number;
+  /** Distinct names in the reference-name dictionary (schema v4). */
+  readonly reference_names: number;
 }
 
 interface prepared_statements {
@@ -102,6 +104,8 @@ interface prepared_statements {
   readonly insert_symbol: Statement;
   readonly insert_relationship: Statement;
   readonly insert_reference: Statement;
+  readonly insert_reference_name: Statement;
+  readonly select_reference_name_key: Statement;
   readonly insert_import: Statement;
   readonly insert_export: Statement;
   readonly delete_file: Statement;
@@ -170,6 +174,10 @@ export class index_store {
       const resolve_key = (id: string | undefined): number | null =>
         id === undefined ? null : (symbol_key_by_id.get(id) ?? this.#live_symbol_key(id));
 
+      // Interned per file: reference names repeat heavily across a project, and
+      // this map makes the dictionary a once-per-distinct-name cost.
+      const name_keys = new Map<string, number>();
+
       for (const edge of analysis.relationships) {
         this.#insert_relationship(edge, file_id, resolve_key);
       }
@@ -180,7 +188,7 @@ export class index_store {
         this.#insert_export(item, file_id, resolve_key);
       }
       for (const item of analysis.references) {
-        this.#insert_reference(item, file_id, resolve_key);
+        this.#insert_reference(item, file_id, resolve_key, name_keys);
       }
     });
   }
@@ -442,6 +450,7 @@ export class index_store {
       references: this.#count_rows(REFERENCES_TABLE),
       imports: this.#count_rows('imports'),
       exports: this.#count_rows('exports'),
+      reference_names: this.#count_rows('reference_names'),
     };
   }
 
@@ -558,10 +567,27 @@ export class index_store {
     item: code_reference,
     file_id: number,
     resolve_key: (id: string | undefined) => number | null,
+    name_keys: Map<string, number>,
   ): void {
+    let name_key = name_keys.get(item.name);
+    if (name_key === undefined) {
+      // Insert-then-select rather than reading last_insert_rowid, because OR
+      // IGNORE returns nothing for a name that is already in the dictionary.
+      this.#statements.insert_reference_name.run(item.name);
+      const row = this.#statements.select_reference_name_key.get(item.name) as { key: number } | undefined;
+      if (row === undefined) {
+        throw new code_intelligence_error({
+          code: 'index_unavailable',
+          message: `Reference name interning failed for '${item.name}'.`,
+          hint: 'Delete .code-intelligence and reindex.',
+        });
+      }
+      name_key = row.key;
+      name_keys.set(item.name, name_key);
+    }
     this.#statements.insert_reference.run(
       file_id,
-      item.name,
+      name_key,
       resolve_key(item.symbol_id),
       resolve_key(item.enclosing_symbol_id),
       item.line,
@@ -691,11 +717,12 @@ function prepare_statements(db: database_handle): prepared_statements {
     LEFT JOIN symbols ts ON ts.key = r.to_key`;
 
   const references_select = `
-    SELECT r.key, r.name, r.line, r.column, r.is_definition, f.file_path,
+    SELECT r.key, d.name AS name, r.line, r.column, r.is_definition, f.file_path,
            s.id AS symbol_id,
            es.id AS enclosing_symbol_id
     FROM ${REFERENCES_TABLE} r
     JOIN files f ON f.file_id = r.file_id
+    JOIN reference_names d ON d.key = r.name_key
     LEFT JOIN symbols s ON s.key = r.symbol_key
     LEFT JOIN symbols es ON es.key = r.enclosing_symbol_key`;
 
@@ -730,10 +757,12 @@ function prepare_statements(db: database_handle): prepared_statements {
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
     ),
     insert_reference: db.prepare(
-      `INSERT INTO ${REFERENCES_TABLE} (file_id, name, symbol_key, enclosing_symbol_key,
+      `INSERT INTO ${REFERENCES_TABLE} (file_id, name_key, symbol_key, enclosing_symbol_key,
                                         line, column, is_definition)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
     ),
+    insert_reference_name: db.prepare('INSERT OR IGNORE INTO reference_names (name) VALUES (?)'),
+    select_reference_name_key: db.prepare('SELECT key FROM reference_names WHERE name = ?'),
     insert_import: db.prepare(
       `INSERT INTO imports (file_id, kind, module_specifier, imported_name, local_name,
                             resolved_path, is_internal, line)
@@ -770,7 +799,7 @@ function prepare_statements(db: database_handle): prepared_statements {
     ),
     select_exports_by_file: db.prepare(`${exports_select} WHERE f.file_path = ? ORDER BY e.line`),
     select_references_by_name: db.prepare(
-      `${references_select} WHERE r.name = ? ORDER BY f.file_path, r.line LIMIT ?`,
+      `${references_select} WHERE d.name = ? ORDER BY f.file_path, r.line LIMIT ?`,
     ),
     select_references_to: db.prepare(
       `${references_select} WHERE r.symbol_key = (SELECT key FROM symbols WHERE id = ?)

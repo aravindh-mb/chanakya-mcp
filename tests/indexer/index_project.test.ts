@@ -114,6 +114,20 @@ describe('index_project', () => {
 
     expect(result.duration_ms).toBeGreaterThanOrEqual(0);
   });
+
+  it('reports a timings breakdown that is consistent with the duration', async () => {
+    project = create_temp_project(SAMPLE_PROJECT);
+    const { result } = await index(project);
+
+    const { timings } = result;
+    expect(timings.total_ms).toBe(result.duration_ms);
+    for (const key of ['scan_ms', 'analyze_ms', 'write_ms', 'graph_ms'] as const) {
+      expect(timings[key]).toBeGreaterThanOrEqual(0);
+    }
+    // A real project must show up somewhere: scan and analyze happen on actual
+    // files, so at least one of them should be nonzero.
+    expect(timings.scan_ms + timings.analyze_ms + timings.write_ms).toBeGreaterThan(0);
+  });
 });
 
 describe('index_project persistence', () => {

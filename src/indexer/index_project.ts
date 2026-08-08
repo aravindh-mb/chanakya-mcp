@@ -53,6 +53,19 @@ export interface index_failure {
   readonly reason: string;
 }
 
+/** Where an indexing run's wall-clock time went, so slow runs can be diagnosed. */
+export interface index_timings {
+  /** Directory walk, language detection and ignore-rule resolution. */
+  readonly scan_ms: number;
+  /** Parsing and extraction of the files that needed work. */
+  readonly analyze_ms: number;
+  /** Committing analyses to the database. */
+  readonly write_ms: number;
+  /** The cross-file graph resolution pass. */
+  readonly graph_ms: number;
+  readonly total_ms: number;
+}
+
 export interface index_project_result {
   /** New files written. */
   readonly files_added: number;
@@ -72,6 +85,7 @@ export interface index_project_result {
   readonly files_parsed: number;
   readonly duration_ms: number;
   readonly failures: readonly index_failure[];
+  readonly timings: index_timings;
 }
 
 export async function index_project(options: index_project_options): Promise<index_project_result> {
@@ -80,7 +94,16 @@ export async function index_project(options: index_project_options): Promise<ind
   const batch_size = options.batch_size ?? DEFAULT_WRITE_BATCH_SIZE;
   const log = options.logger;
 
+  const timings = {
+    scan_ms: 0,
+    analyze_ms: 0,
+    write_ms: 0,
+    graph_ms: 0,
+  };
+
+  const scan_started_at = Date.now();
   const scan = await scan_project({ root_path, ...options.scan });
+  timings.scan_ms = Date.now() - scan_started_at;
   const stored = options.force === true ? new Map() : store.list_file_stamps();
   const changes = detect_changes({ stored, scanned: scan.files });
   const files = build_file_index(scan.files);
@@ -118,13 +141,17 @@ export async function index_project(options: index_project_options): Promise<ind
 
   for (let offset = 0; offset < work.length; offset += batch_size) {
     const batch = work.slice(offset, offset + batch_size);
+    const analyze_started_at = Date.now();
     const writes = await analyze_batch(batch, stored, stats, failures, log, files);
+    timings.analyze_ms += Date.now() - analyze_started_at;
 
+    const write_started_at = Date.now();
     store.transaction(() => {
       for (const analysis of writes) {
         store.write_file_analysis(analysis);
       }
     });
+    timings.write_ms += Date.now() - write_started_at;
   }
 
   store.set_metadata(METADATA_KEYS.indexed_at, String(Date.now()));
@@ -133,8 +160,10 @@ export async function index_project(options: index_project_options): Promise<ind
   if (stats.files_added + stats.files_updated + changes.deleted.length > 0) {
     // With the per-file graph stored, follow imports across files and point
     // every unresolved call edge at the symbol it actually calls.
+    const graph_started_at = Date.now();
     resolve_project_graph(options.logger === undefined ? { store } : { store, logger: options.logger });
     store.optimize();
+    timings.graph_ms = Date.now() - graph_started_at;
   }
 
   return {
@@ -142,6 +171,10 @@ export async function index_project(options: index_project_options): Promise<ind
     files_removed: changes.deleted.length,
     duration_ms: Date.now() - started_at,
     failures,
+    timings: {
+      ...timings,
+      total_ms: Date.now() - started_at,
+    },
   };
 }
 
