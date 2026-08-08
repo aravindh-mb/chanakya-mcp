@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-08T13:23:42.217Z",
+  "generated_at": "2026-08-08T13:43:57.073Z",
   "node_version": "v24.11.1",
   "runs": 11,
   "project": {
@@ -11,7 +11,7 @@
     "references": 377
   },
   "index": {
-    "duration_ms": 63,
+    "duration_ms": 73,
     "db_bytes": 4096,
     "files_parsed": 16
   },
@@ -20,66 +20,66 @@
       "name": "Where is create_user defined?",
       "ask": "Locating a symbol before editing it.",
       "mcp": {
-        "median_ms": 0.35,
+        "median_ms": 0.34,
         "median_bytes": 475,
         "tokens": 119
       },
       "naive": {
-        "median_ms": 20.41,
+        "median_ms": 21.55,
         "median_bytes": 2718,
         "tokens": 680,
         "grep_only_bytes": 229,
         "grep_only_tokens": 57,
         "files_opened": 2
       },
-      "speedup": 59.09,
+      "speedup": 63.61,
       "context_saved_pct": 82.52
     },
     {
       "name": "Everything that uses format_money",
       "ask": "The blast radius of changing a shared helper.",
       "mcp": {
-        "median_ms": 0.24,
+        "median_ms": 0.26,
         "median_bytes": 599,
         "tokens": 150
       },
       "naive": {
-        "median_ms": 19.04,
+        "median_ms": 20.36,
         "median_bytes": 2274,
         "tokens": 569,
         "grep_only_bytes": 458,
         "grep_only_tokens": 115,
         "files_opened": 3
       },
-      "speedup": 78.9,
+      "speedup": 78.57,
       "context_saved_pct": 73.66
     },
     {
       "name": "Who calls user_service.create_user?",
       "ask": "Finding callers before changing a signature.",
       "mcp": {
-        "median_ms": 0.12,
+        "median_ms": 0.11,
         "median_bytes": 90,
         "tokens": 23
       },
       "naive": {
-        "median_ms": 18.93,
+        "median_ms": 20.42,
         "median_bytes": 2718,
         "tokens": 680,
         "grep_only_bytes": 229,
         "grep_only_tokens": 57,
         "files_opened": 2
       },
-      "speedup": 156.7,
+      "speedup": 182.82,
       "context_saved_pct": 96.69
     },
     {
       "name": "What does the user service depend on?",
       "ask": "Understanding a module before touching it.",
       "mcp": {
-        "median_ms": 0.1,
-        "median_bytes": 668,
-        "tokens": 167
+        "median_ms": 0.08,
+        "median_bytes": 686,
+        "tokens": 172
       },
       "naive": {
         "median_ms": 0.22,
@@ -89,92 +89,92 @@
         "grep_only_tokens": 0,
         "files_opened": 1
       },
-      "speedup": 2.27,
-      "context_saved_pct": 43.96
+      "speedup": 2.68,
+      "context_saved_pct": 42.45
     },
     {
       "name": "What breaks if I change the shared types?",
       "ask": "Cross-package impact in a monorepo.",
       "mcp": {
         "median_ms": 0.2,
-        "median_bytes": 93,
-        "tokens": 23
+        "median_bytes": 370,
+        "tokens": 93
       },
       "naive": {
-        "median_ms": 21.85,
+        "median_ms": 20.83,
         "median_bytes": 6272,
         "tokens": 1568,
         "grep_only_bytes": 1016,
         "grep_only_tokens": 254,
         "files_opened": 8
       },
-      "speedup": 107.88,
-      "context_saved_pct": 98.52
+      "speedup": 102.86,
+      "context_saved_pct": 94.1
     },
     {
       "name": "Structure of the user service",
       "ask": "Seeing a class outline without reading it.",
       "mcp": {
-        "median_ms": 0.07,
+        "median_ms": 0.08,
         "median_bytes": 2068,
         "tokens": 517
       },
       "naive": {
-        "median_ms": 0.14,
+        "median_ms": 0.18,
         "median_bytes": 1192,
         "tokens": 298,
         "grep_only_bytes": 0,
         "grep_only_tokens": 0,
         "files_opened": 1
       },
-      "speedup": 2.16,
+      "speedup": 2.37,
       "context_saved_pct": -73.49
     },
     {
       "name": "Which React components use the orders hook?",
       "ask": "Tracing a hook through the frontend.",
       "mcp": {
-        "median_ms": 0.23,
-        "median_bytes": 572,
-        "tokens": 143
+        "median_ms": 0.26,
+        "median_bytes": 1586,
+        "tokens": 397
       },
       "naive": {
-        "median_ms": 20.97,
+        "median_ms": 19.33,
         "median_bytes": 1557,
         "tokens": 389,
         "grep_only_bytes": 352,
         "grep_only_tokens": 88,
         "files_opened": 2
       },
-      "speedup": 89.68,
-      "context_saved_pct": 63.26
+      "speedup": 74.11,
+      "context_saved_pct": -1.86
     },
     {
       "name": "Full working context for user_service",
       "ask": "Everything an agent needs before a refactor: one call versus reading the layer.",
       "mcp": {
-        "median_ms": 0.31,
-        "median_bytes": 2327,
-        "tokens": 582
+        "median_ms": 0.35,
+        "median_bytes": 2756,
+        "tokens": 689
       },
       "naive": {
-        "median_ms": 0.56,
+        "median_ms": 0.61,
         "median_bytes": 4024,
         "tokens": 1006,
         "grep_only_bytes": 0,
         "grep_only_tokens": 0,
         "files_opened": 4
       },
-      "speedup": 1.84,
-      "context_saved_pct": 42.17
+      "speedup": 1.75,
+      "context_saved_pct": 31.51
     }
   ],
   "summary": {
-    "median_speedup": 69,
+    "median_speedup": 68.86,
     "context_bytes_naive": 21947,
-    "context_bytes_mcp": 6892,
+    "context_bytes_mcp": 8630,
     "context_tokens_naive": 5487,
-    "context_tokens_mcp": 1723,
-    "context_saved_pct": 68.6
+    "context_tokens_mcp": 2158,
+    "context_saved_pct": 60.68
   }
 }

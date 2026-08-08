@@ -1,5 +1,7 @@
 # @code-intelligence/mcp
 
+# @codebrain/mcp
+
 A local [MCP](https://modelcontextprotocol.io) server that gives AI coding agents — Claude Code, Cursor,
 and any other MCP-compatible client — deep structural knowledge of a JavaScript/TypeScript codebase.
 
@@ -26,14 +28,14 @@ Everything runs locally. No source code is uploaded anywhere, and no AI or embed
 Run it directly, no install required:
 
 ```bash
-npx @code-intelligence/mcp
+npx @codebrain/mcp
 ```
 
 Or install globally:
 
 ```bash
-npm install -g @code-intelligence/mcp
-code-intelligence-mcp
+npm install -g @codebrain/mcp
+codebrain-mcp
 ```
 
 > Not published to npm yet. See [Development](#development) to run it from source.
@@ -42,13 +44,13 @@ code-intelligence-mcp
 
 ```bash
 # index the current directory
-code-intelligence-mcp
+codebrain-mcp
 
 # index a specific project
-code-intelligence-mcp /path/to/project
+codebrain-mcp /path/to/project
 
 # verbose diagnostics
-code-intelligence-mcp ./apps/api --verbose
+codebrain-mcp ./apps/api --verbose
 ```
 
 ### Options
@@ -72,7 +74,7 @@ Exit codes: `0` success, `1` runtime error, `2` usage error.
 The server talks MCP over stdio: index the project, then point Claude at the binary:
 
 ```bash
-claude mcp add code-intelligence -- npx -y @code-intelligence/mcp /path/to/project
+claude mcp add codebrain -- npx -y @codebrain/mcp /path/to/project
 ```
 
 ## Cursor setup
@@ -82,9 +84,9 @@ Add to `.cursor/mcp.json`:
 ```json
 {
   "mcpServers": {
-    "code-intelligence": {
+    "codebrain": {
       "command": "npx",
-      "args": ["-y", "@code-intelligence/mcp", "/path/to/project"]
+      "args": ["-y", "@codebrain/mcp", "/path/to/project"]
     }
   }
 }

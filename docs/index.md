@@ -2,12 +2,12 @@
 layout: home
 
 hero:
-  name: Code Intelligence MCP
+  name: Codebrain MCP
   text: Structural code intelligence for AI agents
   tagline: A local MCP server that gives AI coding agents deep structural knowledge of a JavaScript/TypeScript codebase.
   image:
     src: /logo.svg
-    alt: Code Intelligence MCP
+    alt: Codebrain MCP
   actions:
     - theme: brand
       text: Get Started
@@ -43,7 +43,7 @@ an agent can ask "where is `UserService` defined?" or "what calls `create_user`?
 answer.
 
 ```bash
-npx @code-intelligence/mcp /path/to/project
+npx @codebrain/mcp /path/to/project
 ```
 
 Everything runs locally. No source code is uploaded anywhere, and no AI or embedding API is required.

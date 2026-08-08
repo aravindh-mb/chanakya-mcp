@@ -47,6 +47,29 @@ const CANDIDATE_EXTENSIONS: readonly string[] = [
   '.d.ts',
 ];
 
+/**
+ * Extension **substitutions**, which are different from the probes above.
+ *
+ * Under `"module": "NodeNext"` TypeScript requires the specifier to name the
+ * *output* file: you write `import './user.js'` while the file on disk is
+ * `user.ts`. This is not a stylistic choice, it is what the compiler mandates,
+ * and it is how most modern TypeScript ESM projects — including this one — are
+ * written.
+ *
+ * Appending extensions cannot resolve that, because `./user.js` is already a
+ * complete-looking path: `user.js.ts` does not exist and the lookup fails. The
+ * result is that on an entire class of real projects, no relative import
+ * resolves and every cross-file relationship silently disappears. So the
+ * written extension is swapped for the source extensions it could have come
+ * from.
+ */
+const EXTENSION_SUBSTITUTIONS: Readonly<Record<string, readonly string[]>> = {
+  '.js': ['.ts', '.tsx', '.d.ts'],
+  '.jsx': ['.tsx'],
+  '.mjs': ['.mts', '.d.mts'],
+  '.cjs': ['.cts', '.d.cts'],
+};
+
 export interface resolve_module_specifier_options {
   /** POSIX path of the importing file, e.g. `src/app.ts`. */
   readonly from_file_path: string;
@@ -78,6 +101,14 @@ export function resolve_module_specifier(options: resolve_module_specifier_optio
     return base;
   }
 
+  // Before probing, try swapping a written output extension for its source
+  // extension: `./user.js` -> `user.ts`. Checked ahead of the probes because
+  // the specifier already carries an extension, so appending cannot match.
+  const substituted = resolve_by_substitution(base, files);
+  if (substituted !== undefined) {
+    return substituted;
+  }
+
   for (const extension of CANDIDATE_EXTENSIONS) {
     if (files.has(base + extension)) {
       return base + extension;
@@ -89,6 +120,29 @@ export function resolve_module_specifier(options: resolve_module_specifier_optio
     if (files.has(index_file)) {
       return index_file;
     }
+  }
+
+  return undefined;
+}
+
+/** `./user.js` -> `user.ts`. See `EXTENSION_SUBSTITUTIONS`. */
+function resolve_by_substitution(base: string, files: file_index): string | undefined {
+  for (const [written, sources] of Object.entries(EXTENSION_SUBSTITUTIONS)) {
+    if (!base.endsWith(written)) {
+      continue;
+    }
+
+    const without_extension = base.slice(0, -written.length);
+    for (const source of sources) {
+      const candidate = without_extension + source;
+      if (files.has(candidate)) {
+        return candidate;
+      }
+    }
+
+    // A specifier ending in `.js` names exactly one file. Once the written
+    // extension is recognised, no other substitution applies.
+    return undefined;
   }
 
   return undefined;

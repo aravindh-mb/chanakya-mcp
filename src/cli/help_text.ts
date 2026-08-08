@@ -19,8 +19,8 @@ OPTIONS
       --                  Treat every following argument as the project path.
 
 EXAMPLES
-  npx @code-intelligence/mcp
-  npx @code-intelligence/mcp /path/to/project
+  npx @codebrain/mcp
+  npx @codebrain/mcp /path/to/project
   ${binary_name} ./apps/api --verbose
   ${binary_name} --watch
 

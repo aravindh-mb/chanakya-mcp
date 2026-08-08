@@ -1,11 +1,11 @@
 {
-  "name": "@code-intelligence/mcp",
+  "name": "@aravindh-arumugam/codebrain-mcp",
   "version": "0.1.0",
   "description": "Local MCP server that gives AI coding agents deep structural knowledge of a JavaScript/TypeScript codebase.",
   "keywords": [
     "mcp",
     "model-context-protocol",
-    "code-intelligence",
+    "codebrain",
     "typescript",
     "javascript",
     "tree-sitter",
@@ -19,7 +19,7 @@
     "node": ">=18.18.0"
   },
   "bin": {
-    "code-intelligence-mcp": "./dist/cli/main.js"
+    "codebrain-mcp": "dist/cli/main.js"
   },
   "main": "./dist/index.js",
   "module": "./dist/index.js",
