@@ -104,6 +104,14 @@ describe('run_cli', () => {
     expect(sink.stderr.join('')).toMatch(/found \d+ source files/);
   });
 
+  it('reports what the parser found', async () => {
+    const sink = create_capture();
+
+    await run([], temp_dir, sink);
+
+    expect(sink.stderr.join('')).toMatch(/parsed \d+ files/);
+  });
+
   it('includes the fix hint in error output', async () => {
     const sink = create_capture();
 

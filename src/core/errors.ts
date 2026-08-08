@@ -12,6 +12,10 @@ export type error_code =
   | 'invalid_project_root'
   | 'project_root_not_found'
   | 'project_root_not_directory'
+  | 'unsupported_language'
+  | 'parser_unavailable'
+  | 'source_too_large'
+  | 'file_not_readable'
   | 'internal_error';
 
 export interface error_options {

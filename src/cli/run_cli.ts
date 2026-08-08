@@ -7,6 +7,7 @@ import { describe_unknown_error, is_code_intelligence_error } from '../core/erro
 import { create_logger, type logger } from '../core/logger.js';
 import { read_package_meta } from '../core/package_meta.js';
 import { resolve_project_root } from '../core/project_root.js';
+import { parse_file } from '../parser/parse_file.js';
 import { scan_project } from '../scanner/file_scanner.js';
 import type { language_id } from '../scanner/language.js';
 import type { scan_result } from '../scanner/types.js';
@@ -62,7 +63,9 @@ export async function run_cli(options: run_cli_options): Promise<exit_code> {
     const scan = await scan_project({ root_path: root.root_path });
     report_scan(scan, logger);
 
-    logger.info('scan ok - parsing and the MCP server are not implemented yet (phase 2 of 20)');
+    await report_parse(scan, logger);
+
+    logger.info('ok - the symbol model and MCP server are not implemented yet (phase 3 of 20)');
 
     return EXIT_CODE.success;
   } catch (error: unknown) {
@@ -92,6 +95,46 @@ function report_scan(scan: scan_result, log: logger): void {
     for (const entry of scan.skipped) {
       log.debug(`  ${entry.relative_path} [${entry.reason}] ${entry.detail}`);
     }
+  }
+}
+
+/**
+ * Parse every scanned file and summarize.
+ *
+ * Files are parsed one at a time and the result is discarded immediately: only
+ * the counters survive, so memory stays flat regardless of repository size.
+ * Phases 6 and 7 replace this with a persistent index.
+ */
+async function report_parse(scan: scan_result, log: logger): Promise<void> {
+  const started_at = Date.now();
+  let parsed = 0;
+  let with_syntax_errors = 0;
+  let failed = 0;
+
+  for (const file of scan.files) {
+    try {
+      const result = await parse_file({ file_path: file.file_path });
+      parsed += 1;
+      if (result.has_errors) {
+        with_syntax_errors += 1;
+        log.debug(
+          `  ${file.relative_path}: ${result.parse_errors.length} syntax issue(s), ` +
+            `first at line ${result.parse_errors[0]?.range.start.line ?? 0}`,
+        );
+      }
+    } catch (error: unknown) {
+      // One unparseable file must not abort the run, but it is reported.
+      failed += 1;
+      log.warn(`  ${file.relative_path}: ${describe_unknown_error(error)}`);
+    }
+  }
+
+  log.info(`parsed ${parsed} files in ${Date.now() - started_at}ms`);
+  if (with_syntax_errors > 0) {
+    log.info(`${with_syntax_errors} file(s) contain syntax errors (still indexable; use --verbose)`);
+  }
+  if (failed > 0) {
+    log.info(`${failed} file(s) could not be parsed at all`);
   }
 }
 

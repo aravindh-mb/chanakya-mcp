@@ -52,6 +52,21 @@ export {
   type skipped_entry,
 } from './scanner/types.js';
 
+export { parse_file, parse_source } from './parser/parse_file.js';
+export { get_grammar, get_parser, reset_parser_cache } from './parser/language_registry.js';
+export {
+  DEFAULT_MAX_PARSE_ERRORS,
+  DEFAULT_MAX_SOURCE_BYTES,
+  type parse_error,
+  type parse_error_kind,
+  type parse_file_options,
+  type parse_source_options,
+  type parsed_file,
+  type source_position,
+  type source_range,
+  type syntax_node,
+} from './parser/types.js';
+
 export { parse_args } from './cli/parse_args.js';
 export { run_cli, BINARY_NAME, type run_cli_options } from './cli/run_cli.js';
 export { EXIT_CODE, type cli_options, type exit_code } from './cli/types.js';
