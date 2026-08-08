@@ -1,9 +1,9 @@
-# Scanning & Language Grammars
+﻿# Scanning & Language Grammars
 
-Codebrain MCP features a high-performance repository scanner paired with **native Tree-Sitter grammars**. It parses files into concrete syntax trees without spawning separate compiler processes.
+Chanakya MCP features a high-performance repository scanner paired with **native Tree-Sitter grammars**. It parses files into concrete syntax trees without spawning separate compiler processes.
 
 <div class="custom-banner">
-  <div class="custom-banner-icon">⚡</div>
+  <div class="custom-banner-icon">âš¡</div>
   <div class="custom-banner-content">
     <h4>Native N-API Prebuilds</h4>
     <p>Zero WASM overhead. Codebrain ships native precompiled Tree-Sitter binaries across macOS, Linux, and Windows for both x64 and arm64 architectures.</p>
@@ -79,7 +79,8 @@ To ensure complete compatibility with AI agents and code editors, Codebrain norm
 The file scanner automatically honors repository ignore rules:
 
 - **Recursive `.gitignore` Support:** Accurately evaluates nested `.gitignore` files within subdirectories, including negative negation patterns (`!keep.js`).
-- **Default Skipped Folders:** `node_modules`, `.git`, `dist`, `build`, `coverage`, `out`, `.next`, `.nuxt`, `.turbo`, `.cache`, `.yarn`, `.pnpm-store`, `.code-intelligence`.
+- **Default Skipped Folders:** `node_modules`, `.git`, `dist`, `build`, `coverage`, `out`, `.next`, `.nuxt`, `.turbo`, `.cache`, `.yarn`, `.pnpm-store`, `.chanakya`.
 - **Minified Files & Bundles:** Automatically ignores `*.min.js`, `*.bundle.js`, and `*.map`.
 - **File Size Cap:** Skips files exceeding 1 MiB to prevent heap saturation.
 - **Symlink Sandbox:** Symlinks are not followed outside the project root; all resolved targets are validated with realpath containment checks.
+

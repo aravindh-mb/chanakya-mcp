@@ -16,7 +16,7 @@ import { parse_args } from './parse_args.js';
 import { EXIT_CODE, type cli_options as cli_options_type, type exit_code } from './types.js';
 import type { Readable } from 'node:stream';
 
-export const BINARY_NAME = 'codebrain-mcp';
+export const BINARY_NAME = 'chanakya-mcp';
 
 export interface run_cli_options {
   /** Arguments after `node` and the script path. */

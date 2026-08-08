@@ -1,9 +1,9 @@
-# Search & ReDoS Safety
+﻿# Search & ReDoS Safety
 
-Codebrain MCP provides two high-performance search mechanisms designed for AI coding agents: **`search_symbols`** (relational index search) and **`search_code`** (content search annotated with enclosing AST symbols).
+Chanakya MCP provides two high-performance search mechanisms designed for AI coding agents: **`search_symbols`** (relational index search) and **`search_code`** (content search annotated with enclosing AST symbols).
 
 <div class="custom-banner">
-  <div class="custom-banner-icon">🔍</div>
+  <div class="custom-banner-icon">ðŸ”</div>
   <div class="custom-banner-content">
     <h4>Sub-Millisecond Search Latency</h4>
     <p>Symbol queries execute in ~0.05ms against pre-built SQLite indexes, while full-text searches stream directly through a ReDoS-isolated worker thread.</p>
@@ -12,7 +12,7 @@ Codebrain MCP provides two high-performance search mechanisms designed for AI co
 
 ---
 
-## 1. `search_symbols` — Tri-Tier Ranked Symbol Search
+## 1. `search_symbols` â€” Tri-Tier Ranked Symbol Search
 
 `search_symbols` searches declaration names across the indexed codebase. To provide the best relevancy while avoiding expensive scans, queries run in a prioritized 3-tier sequence:
 
@@ -39,7 +39,7 @@ call_tool("search_symbols", {
 
 ---
 
-## 2. `search_code` — Enclosing Symbol Annotation
+## 2. `search_code` â€” Enclosing Symbol Annotation
 
 `search_code` scans file contents on disk. Rather than returning raw disjoint lines, Codebrain annotates every code match with its **innermost enclosing AST symbol**:
 
@@ -81,3 +81,4 @@ Against a 30-character non-matching line: 15+ seconds of CPU lockup!
 ## 4. SQL Parameterization & Escaping
 
 All database queries are executed using strictly parameterized SQL statements. Additionally, user search strings are escaped for SQLite `LIKE` wildcards (`%`, `_`, `\`), ensuring that searching for literal percentage signs or underscores searches for the exact text without triggering unintended table-wide matches.
+

@@ -12,7 +12,7 @@ import { isAbsolute, resolve } from 'node:path';
 import { code_intelligence_error } from './errors.js';
 
 /** Directory created inside the project for the local index and caches. */
-export const DATA_DIR_NAME = '.code-intelligence';
+export const DATA_DIR_NAME = '.chanakya';
 
 export interface project_root {
   /** Absolute, symlink-resolved path to the project root. */
@@ -36,7 +36,7 @@ export function resolve_project_root(options: resolve_project_root_options = {})
     throw new code_intelligence_error({
       code: 'invalid_project_root',
       message: 'The project path is empty.',
-      hint: 'Pass a directory, for example: code-intelligence-mcp ./my-app',
+      hint: 'Pass a directory, for example: chanakya-mcp ./my-app',
     });
   }
 

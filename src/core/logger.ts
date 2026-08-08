@@ -46,7 +46,7 @@ export function create_logger(options: logger_options): logger {
       return;
     }
     const suffix = details.length === 0 ? '' : ` ${details.map(format_detail).join(' ')}`;
-    write(`[code-intelligence] ${message_level}: ${message}${suffix}`);
+    write(`[chanakya] ${message_level}: ${message}${suffix}`);
   };
 
   return {

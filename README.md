@@ -1,4 +1,4 @@
-# @aravindh-arumugam/codebrain-mcp
+# @aravindh-arumugam/chanakya-mcp
 
 A local [MCP](https://modelcontextprotocol.io) server that gives AI coding agents — Claude Code, Cursor,
 and any other MCP-compatible client — deep structural knowledge of a JavaScript/TypeScript codebase.
@@ -33,7 +33,7 @@ Or install globally:
 
 ```bash
 npm install -g @codebrain/mcp
-codebrain-mcp
+chanakya-mcp
 ```
 
 > Not published to npm yet. See [Development](#development) to run it from source.
@@ -42,13 +42,13 @@ codebrain-mcp
 
 ```bash
 # index the current directory
-codebrain-mcp
+chanakya-mcp
 
 # index a specific project
-codebrain-mcp /path/to/project
+chanakya-mcp /path/to/project
 
 # verbose diagnostics
-codebrain-mcp ./apps/api --verbose
+chanakya-mcp ./apps/api --verbose
 ```
 
 ### Options
@@ -73,7 +73,7 @@ The server talks MCP over stdio. Setup takes **2 minutes**:
 
 ### 1. Install the package:
 ```bash
-npm install --save-dev @aravindh-arumugam/codebrain-mcp
+npm install --save-dev @aravindh-arumugam/chanakya-mcp
 ```
 
 ### 2. Create `.mcp.json` at your project root:
@@ -82,7 +82,7 @@ npm install --save-dev @aravindh-arumugam/codebrain-mcp
   "mcpServers": {
     "codebrain": {
       "command": "node",
-      "args": ["./node_modules/@aravindh-arumugam/codebrain-mcp/dist/cli/main.js", "."],
+      "args": ["./node_modules/@aravindh-arumugam/chanakya-mcp/dist/cli/main.js", "."],
       "type": "stdio"
     }
   }
@@ -104,9 +104,9 @@ Close all Claude Code windows and reopen your project. The **codebrain** server 
 - `settings.json` **approves** which servers Claude Code can use
 - No credentials needed — everything runs locally on your machine
 
-## Why use Codebrain MCP?
+## Why use Chanakya MCP?
 
-| Task | Without MCP | With Codebrain MCP | Savings |
+| Task | Without MCP | With Chanakya MCP | Savings |
 |------|-------------|-------------------|---------|
 | **Find a symbol** | 3,500 tokens (grep) | 150 tokens | **95% ↓** |
 | **Find all references** | 4,500 tokens (grep + read files) | 400 tokens | **91% ↓** |
@@ -586,7 +586,7 @@ pnpm run docs:build    # static build to docs/.vitepress/dist
 pnpm run docs:preview  # preview the built site
 ```
 
-To deploy to GitHub Pages under a subpath (e.g. `/codebrain-mcp/`), set `base` in
+To deploy to GitHub Pages under a subpath (e.g. `/chanakya-mcp/`), set `base` in
 `docs/.vitepress/config.ts`; VitePress rewrites internal links automatically.
 
 ### Conventions

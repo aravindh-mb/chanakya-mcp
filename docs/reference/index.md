@@ -1,9 +1,9 @@
-# SQLite Index & Performance
+﻿# SQLite Index & Performance
 
-Codebrain MCP compiles the structural AST of your repository into an embedded SQLite database at `<project>/.code-intelligence/index.db`.
+Chanakya MCP compiles the structural AST of your repository into an embedded SQLite database at `<project>/.chanakya/index.db`.
 
 <div class="custom-banner">
-  <div class="custom-banner-icon">⚡</div>
+  <div class="custom-banner-icon">âš¡</div>
   <div class="custom-banner-content">
     <h4>Sub-Millisecond Relational Storage</h4>
     <p>All tables are indexed on primary lookup paths: symbol names, file paths, parent IDs, and relational graph edge targets.</p>
@@ -45,16 +45,16 @@ Reindexing never re-parses unchanged files:
 
 ```
 File Modified Event
-       ↓
+       â†“
 Stage 1: Size & Mtime Check (18ms stat scan)
-       ↓ (If mismatch)
+       â†“ (If mismatch)
 Stage 2: Content SHA-256 Hash Verification
-       ↓ (If hash changed)
+       â†“ (If hash changed)
 Cascade-delete old file rows & Reinsert in single transaction
 ```
 
 ### Racily-Clean Timestamp Protection
-Filesystems have coarse timestamp resolution (1s on ext4, 2s on FAT). If a file is edited within two seconds of being indexed with identical byte count, Codebrain does not trust the mtime alone—it evaluates the content hash to guarantee zero stale data.
+Filesystems have coarse timestamp resolution (1s on ext4, 2s on FAT). If a file is edited within two seconds of being indexed with identical byte count, Codebrain does not trust the mtime aloneâ€”it evaluates the content hash to guarantee zero stale data.
 
 ---
 
@@ -68,3 +68,4 @@ Filesystems have coarse timestamp resolution (1s on ext4, 2s on FAT). If a file 
 | **Database Size on Disk**| **2.0 MB** | 256 MB (interned) |
 | **Extracted Symbols** | 655 symbols | 122,936 symbols |
 | **Relational Edges** | 1,840 edges | 370,534 relationships |
+

@@ -10,22 +10,22 @@ const configs = {
     steps: [
       {
         title: 'Option A: Quick CLI Add (Recommended)',
-        code: 'claude mcp add codebrain -- npx -y @aravindh-arumugam/codebrain-mcp /path/to/project',
+        code: 'claude mcp add chanakya -- npx -y @aravindh-arumugam/chanakya-mcp /path/to/project',
         lang: 'bash',
       },
       {
         title: 'Option B: Project .mcp.json',
         code: JSON.stringify({
           mcpServers: {
-            codebrain: {
+            chanakya: {
               command: "node",
-              args: ["./node_modules/@aravindh-arumugam/codebrain-mcp/dist/cli/main.js", "."],
+              args: ["./node_modules/@aravindh-arumugam/chanakya-mcp/dist/cli/main.js", "."],
               type: "stdio"
             }
           }
         }, null, 2),
         lang: 'json',
-        note: 'Add "codebrain" to enabledMcpjsonServers in your ~/.claude/settings.json'
+        note: 'Add "chanakya" to enabledMcpjsonServers in your ~/.claude/settings.json'
       }
     ]
   },
@@ -37,9 +37,9 @@ const configs = {
         title: 'Add to .cursor/mcp.json',
         code: JSON.stringify({
           mcpServers: {
-            codebrain: {
+            chanakya: {
               command: "npx",
-              args: ["-y", "@aravindh-arumugam/codebrain-mcp", "${workspaceFolder}"]
+              args: ["-y", "@aravindh-arumugam/chanakya-mcp", "${workspaceFolder}"]
             }
           }
         }, null, 2),
@@ -56,9 +56,9 @@ const configs = {
         title: 'Add to ~/.codeium/windsurf/mcp_config.json',
         code: JSON.stringify({
           mcpServers: {
-            codebrain: {
+            chanakya: {
               command: "npx",
-              args: ["-y", "@aravindh-arumugam/codebrain-mcp", "/absolute/path/to/project"]
+              args: ["-y", "@aravindh-arumugam/chanakya-mcp", "/absolute/path/to/project"]
             }
           }
         }, null, 2),
@@ -74,9 +74,9 @@ const configs = {
         title: 'Add to Cline MCP Settings (cline_mcp_settings.json)',
         code: JSON.stringify({
           mcpServers: {
-            codebrain: {
+            chanakya: {
               command: "npx",
-              args: ["-y", "@aravindh-arumugam/codebrain-mcp", "/path/to/project"],
+              args: ["-y", "@aravindh-arumugam/chanakya-mcp", "/path/to/project"],
               disabled: false,
               autoApprove: [
                 "search_symbols",

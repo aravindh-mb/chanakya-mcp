@@ -1,15 +1,16 @@
 {
-  "name": "@aravindh-arumugam/codebrain-mcp",
-  "version": "1.1.0",
-  "description": "Local MCP server that gives AI coding agents deep structural knowledge of a JavaScript/TypeScript codebase.",
+  "name": "@aravindh-arumugam/chanakya-mcp",
+  "version": "2.0.0",
+  "description": "Chanakya MCP: Local Model Context Protocol server delivering deep structural AST intelligence and 80-93% token reduction for AI coding agents.",
   "keywords": [
     "mcp",
     "model-context-protocol",
-    "codebrain",
+    "chanakya",
     "typescript",
     "javascript",
     "tree-sitter",
     "static-analysis",
+    "ast",
     "claude-code",
     "cursor"
   ],
@@ -19,7 +20,7 @@
     "node": ">=18.18.0"
   },
   "bin": {
-    "codebrain-mcp": "dist/cli/main.js"
+    "chanakya-mcp": "dist/cli/main.js"
   },
   "main": "./dist/index.js",
   "module": "./dist/index.js",

@@ -19,7 +19,7 @@ describe('create_logger', () => {
   });
 
   it('emits only errors at the error level', () => {
-    expect(collect('error')).toEqual(['[code-intelligence] error: an error']);
+    expect(collect('error')).toEqual(['[chanakya] error: an error']);
   });
 
   it('emits errors, warnings and info at the info level', () => {
@@ -34,7 +34,7 @@ describe('create_logger', () => {
     const lines: string[] = [];
     create_logger({ level: 'info', write: (line) => void lines.push(line) }).info('scanned', 'src/index.ts');
 
-    expect(lines[0]).toBe('[code-intelligence] info: scanned src/index.ts');
+    expect(lines[0]).toBe('[chanakya] info: scanned src/index.ts');
   });
 
   it('serialises object details as JSON', () => {

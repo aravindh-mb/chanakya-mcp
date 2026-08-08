@@ -1,9 +1,9 @@
-# Production Status & Roadmap
+﻿# Production Status & Roadmap
 
-Codebrain MCP is a production-ready, local code intelligence server built for modern AI coding workflows.
+Chanakya MCP is a production-ready, local code intelligence server built for modern AI coding workflows.
 
 <div class="custom-banner">
-  <div class="custom-banner-icon">🎯</div>
+  <div class="custom-banner-icon">ðŸŽ¯</div>
   <div class="custom-banner-content">
     <h4>Production Complete & Fully Tested</h4>
     <p>All core parsing, relational indexing, safe editing, ReDoS sandboxing, and MCP stdio protocols are implemented and verified with comprehensive unit and integration test suites.</p>
@@ -38,3 +38,4 @@ While the structural AST engine is complete, the following pluggable enhancement
 - **Pluggable Local Semantic Search:** Optional local embedding integration (e.g. lightweight ONNX embeddings) for natural-language concept searches that run 100% locally without external APIs.
 - **Language Server Protocol (LSP) Bridge:** Optional LSP adapter to ingest inferred type information from `tsserver` for projects requiring deep type-check analysis.
 - **Python & Rust Grammar Support:** Extending native Tree-Sitter grammars to Python and Rust codebases.
+

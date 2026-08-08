@@ -1,9 +1,9 @@
-# Code Model & AST Extraction
+﻿# Code Model & AST Extraction
 
-Between the raw Tree-Sitter grammar and the SQLite index sits a language-independent code intelligence model. It does not attempt to represent every syntactic token—instead, it extracts the exact facts and relationships that AI coding agents require.
+Between the raw Tree-Sitter grammar and the SQLite index sits a language-independent code intelligence model. It does not attempt to represent every syntactic tokenâ€”instead, it extracts the exact facts and relationships that AI coding agents require.
 
 <div class="custom-banner">
-  <div class="custom-banner-icon">🧩</div>
+  <div class="custom-banner-icon">ðŸ§©</div>
   <div class="custom-banner-content">
     <h4>Language-Agnostic Relational Model</h4>
     <p>Decoupled from specific compiler backends. The normalization layer maps concrete syntax nodes into a uniform, queryable graph.</p>
@@ -61,8 +61,8 @@ type RelationshipKind =
 
 ## Core Extraction Principles
 
-### 1. Zero Guesswork — Confidence Tiers
-Codebrain MCP never fabricates a relationship. Edges carry strict confidence ratings:
+### 1. Zero Guesswork â€” Confidence Tiers
+Chanakya MCP never fabricates a relationship. Edges carry strict confidence ratings:
 - **`certain`**: Derived unambiguously from local syntax (e.g., `contains` parent-child relationships, explicit class method calls).
 - **`resolved`**: Followed confidently across an explicit ES import binding.
 - **Unresolved Calls**: When a call target cannot be determined statically (e.g., dynamic dispatch or ambiguous naming), the edge is stored with `target_name` and `target_id: null`. An agent never receives a misleading fabricated target.
@@ -79,3 +79,4 @@ By excluding line numbers from symbol IDs, adding or deleting lines elsewhere in
 - **Arrow Functions as Functions:** `const handleRequest = () => {}` is recorded as a `function`, matching modern React and TypeScript conventions.
 - **Exclusion of Function-Local Noise:** Transient local variables (`i`, `temp`, `stack`, `curr`) inside function bodies are excluded from the symbol index to prevent cluttering search results. Nested functions and classes declared inside functions are preserved.
 - **Anonymous Default Exports:** `export default function() {}` is indexed under the canonical name `default`.
+

@@ -21,8 +21,8 @@ export interface package_meta {
 }
 
 const FALLBACK_META: package_meta = {
-  name: '@aravindh-arumugam/codebrain-mcp',
-  version: '1.1.0',
+  name: '@aravindh-arumugam/chanakya-mcp',
+  version: '2.0.0',
 };
 
 let cached_meta: package_meta | undefined;

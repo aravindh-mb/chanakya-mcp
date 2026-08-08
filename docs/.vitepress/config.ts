@@ -1,9 +1,9 @@
-import { defineConfig } from 'vitepress';
+﻿import { defineConfig } from 'vitepress';
 
 export default defineConfig({
-  title: 'Codebrain MCP',
+  title: 'Chanakya MCP',
   description:
-    'High-performance local Model Context Protocol server delivering deep structural AST intelligence and 95% token reduction for AI coding agents.',
+    'High-performance local Model Context Protocol server delivering deep structural AST intelligence and 80-93% token reduction for AI coding agents.',
   lastUpdated: true,
   cleanUrls: true,
 
@@ -11,8 +11,8 @@ export default defineConfig({
     ['link', { rel: 'icon', type: 'image/svg+xml', href: '/logo.svg' }],
     ['meta', { name: 'theme-color', content: '#38bdf8' }],
     ['meta', { property: 'og:type', content: 'website' }],
-    ['meta', { property: 'og:title', content: 'Codebrain MCP - Structural Code Intelligence for AI Agents' }],
-    ['meta', { property: 'og:description', content: 'Supercharge Claude Code, Cursor, and Windsurf with exact AST symbol graphs, local SQLite indexing, and atomic safe edits.' }],
+    ['meta', { property: 'og:title', content: 'Chanakya MCP - Deep Structural Code Intelligence for AI Agents' }],
+    ['meta', { property: 'og:description', content: 'Supercharge Claude Code, Cursor, and Windsurf with exact AST symbol graphs, local SQLite indexing, and atomic safe edits. 80-93% token savings.' }],
     ['meta', { property: 'og:image', content: '/architecture-diagram.svg' }],
     ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
     ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],
@@ -27,7 +27,7 @@ export default defineConfig({
 
   themeConfig: {
     logo: '/logo.svg',
-    siteTitle: 'Codebrain MCP',
+    siteTitle: 'Chanakya MCP',
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
       { text: 'Architecture', link: '/reference/architecture' },
@@ -38,8 +38,8 @@ export default defineConfig({
       {
         text: 'v1.1.0',
         items: [
-          { text: 'Changelog', link: 'https://github.com/aravindh-mb/codebrain-mcp/blob/master/CHANGELOG.md' },
-          { text: 'npm package', link: 'https://www.npmjs.com/package/@aravindh-arumugam/codebrain-mcp' },
+          { text: 'Changelog', link: 'https://github.com/aravindh-mb/chanakya-mcp/blob/master/CHANGELOG.md' },
+          { text: 'npm package', link: 'https://www.npmjs.com/package/@aravindh-arumugam/chanakya-mcp' },
         ],
       },
     ],
@@ -77,13 +77,13 @@ export default defineConfig({
     ],
 
     editLink: {
-      pattern: 'https://github.com/aravindh-mb/codebrain-mcp/edit/master/docs/:path',
+      pattern: 'https://github.com/aravindh-mb/chanakya-mcp/edit/master/docs/:path',
       text: 'Edit this page on GitHub',
     },
 
     footer: {
-      message: 'Released under the MIT License. Zero data telemetry — 100% local execution.',
-      copyright: 'Copyright © 2026 Codebrain MCP Contributors',
+      message: 'Released under the MIT License. Zero data telemetry â€” 100% local execution.',
+      copyright: 'Copyright Â© 2026 Chanakya MCP Contributors',
     },
 
     search: {
@@ -94,7 +94,8 @@ export default defineConfig({
     },
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/aravindh-mb/codebrain-mcp' },
+      { icon: 'github', link: 'https://github.com/aravindh-mb/chanakya-mcp' },
     ],
   },
 });
+

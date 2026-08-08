@@ -1,9 +1,9 @@
-# Security & Sandboxing
+﻿# Security & Sandboxing
 
-Codebrain MCP operates under a **Zero-Trust, Zero-Network local model**. It executes on your machine, interacts only with the codebase you choose to open, and exposes structured AST metadata exclusively over local `stdio`.
+Chanakya MCP operates under a **Zero-Trust, Zero-Network local model**. It executes on your machine, interacts only with the codebase you choose to open, and exposes structured AST metadata exclusively over local `stdio`.
 
 <div class="custom-banner">
-  <div class="custom-banner-icon">🔒</div>
+  <div class="custom-banner-icon">ðŸ”’</div>
   <div class="custom-banner-content">
     <h4>100% Air-Gapped & Private</h4>
     <p>Zero telemetry, zero cloud dependencies, zero tracking. No OpenAI, Anthropic, or external embedding API keys are ever needed or contacted.</p>
@@ -63,3 +63,4 @@ const escaped_query = query.replace(/[%_\\]/g, '\\$&');
 ## Security Reporting
 
 If you discover a security vulnerability, please submit a private report via GitHub Security Advisories or open an issue on the repository. Security patches are prioritized and released promptly.
+

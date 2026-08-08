@@ -37,7 +37,7 @@ async function run(argv: readonly string[], cwd: string, sink: capture, stdin?: 
 let temp_dir: string;
 
 beforeAll(() => {
-  temp_dir = realpathSync.native(mkdtempSync(join(tmpdir(), 'code-intelligence-cli-')));
+  temp_dir = realpathSync.native(mkdtempSync(join(tmpdir(), 'chanakya-cli-')));
 });
 
 afterAll(() => {
@@ -119,7 +119,7 @@ describe('run_cli', () => {
 
     await run([], temp_dir, sink);
 
-    expect(existsSync(join(temp_dir, '.code-intelligence', 'index.db'))).toBe(true);
+    expect(existsSync(join(temp_dir, '.chanakya', 'index.db'))).toBe(true);
   });
 
   it('releases the database handle so a second run succeeds', async () => {

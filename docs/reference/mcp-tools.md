@@ -1,9 +1,9 @@
-# MCP Tools Specification
+﻿# MCP Tools Specification
 
-Codebrain MCP exposes **fourteen schema-validated tools** over standard JSON-RPC 2.0 stdio. Every tool strictly validates its arguments with a Zod schema that doubles as its published JSON Schema.
+Chanakya MCP exposes **fourteen schema-validated tools** over standard JSON-RPC 2.0 stdio. Every tool strictly validates its arguments with a Zod schema that doubles as its published JSON Schema.
 
 <div class="custom-banner">
-  <div class="custom-banner-icon">🛠️</div>
+  <div class="custom-banner-icon">ðŸ› ï¸</div>
   <div class="custom-banner-content">
     <h4>14 Production MCP Tools</h4>
     <p>11 Read-Only structural query tools and 3 Safe Edit mutation tools designed specifically for AI coding agents.</p>
@@ -39,7 +39,7 @@ Finds declarations across the project by name with prioritized exact, prefix, an
 | `path_contains` | `string` | No | Substring filter on POSIX file path. |
 | `exported_only` | `boolean` | No | Restrict to public module exports. |
 | `exclude_ambient` | `boolean` | No | Drop `.d.ts` and ambient declarations. |
-| `limit` | `number` | No | Maximum returned symbols (1–500, default: 50). |
+| `limit` | `number` | No | Maximum returned symbols (1â€“500, default: 50). |
 
 ---
 
@@ -54,9 +54,9 @@ Searches file contents for literal strings or regex patterns, annotating every m
 | `case_sensitive` | `boolean` | No | Case sensitivity flag (default: `false`). |
 | `languages` | `LanguageId[]` | No | Filter by file languages. |
 | `path_contains` | `string` | No | Substring path filter. |
-| `limit` | `number` | No | Total match limit (1–500, default: 100). |
+| `limit` | `number` | No | Total match limit (1â€“500, default: 100). |
 | `max_matches_per_file` | `number` | No | Max matches per individual file. |
-| `context_lines` | `number` | No | Number of surrounding lines to return (0–10). |
+| `context_lines` | `number` | No | Number of surrounding lines to return (0â€“10). |
 | `time_budget_ms` | `number` | No | Worker execution timeout (default: 500ms). |
 
 ---
@@ -129,3 +129,4 @@ Slices directly into a symbol declaration using index-recorded UTF-16 code unit 
 
 ### `rename_symbol`
 Performs atomic, cross-file refactoring: updates the declaration, all resolved reference occurrences, and import/export bindings.
+
