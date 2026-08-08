@@ -3,7 +3,17 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'coverage/**', 'node_modules/**', 'tests/fixtures/**', 'docs/.vitepress/dist/**'],
+    ignores: [
+      'dist/**',
+      'coverage/**',
+      'node_modules/**',
+      'tests/fixtures/**',
+      'docs/.vitepress/dist/**',
+      'docs/.vitepress/cache/**',
+      // A fixture application, deliberately written as ordinary app code rather
+      // than to this package's conventions.
+      'bench/sample-project/**',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -34,6 +44,18 @@ export default tseslint.config(
       'no-console': 'error',
       eqeqeq: ['error', 'always'],
       'prefer-const': 'error',
+    },
+  },
+  {
+    // Benchmark scripts are standalone Node programs: they print to the console
+    // and use Node globals, neither of which the library rules allow.
+    files: ['bench/**/*.mjs'],
+    languageOptions: {
+      globals: { process: 'readonly', console: 'readonly', Buffer: 'readonly' },
+    },
+    rules: {
+      'no-console': 'off',
+      'no-undef': 'off',
     },
   },
   {

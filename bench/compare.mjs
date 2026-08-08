@@ -24,13 +24,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { performance } from 'node:perf_hooks';
 import { rgPath } from '@vscode/ripgrep';
-import {
-  index_project,
-  index_store,
-  mcp_server,
-  search_symbols,
-  DATABASE_FILE_NAME,
-} from '../dist/index.js';
+import { index_project, index_store, mcp_server, search_symbols, DATABASE_FILE_NAME } from '../dist/index.js';
 
 const exec_file = promisify(execFile);
 
@@ -231,7 +225,9 @@ await mkdir(dirname(OUT_PATH), { recursive: true });
 await writeFile(OUT_PATH, `${JSON.stringify(benchmark, null, 2)}\n`);
 
 console.log('code-intelligence/mcp benchmark');
-console.log(`  index: ${index_result.duration_ms}ms (scan ${index_result.timings.scan_ms}ms, analyze ${index_result.timings.analyze_ms}ms, write ${index_result.timings.write_ms}ms, graph ${index_result.timings.graph_ms}ms), ${counts.files} files, ${counts.symbols} symbols, db ${(db_bytes / 1024 / 1024).toFixed(2)}MB`);
+console.log(
+  `  index: ${index_result.duration_ms}ms (scan ${index_result.timings.scan_ms}ms, analyze ${index_result.timings.analyze_ms}ms, write ${index_result.timings.write_ms}ms, graph ${index_result.timings.graph_ms}ms), ${counts.files} files, ${counts.symbols} symbols, db ${(db_bytes / 1024 / 1024).toFixed(2)}MB`,
+);
 console.table(
   results.map((result) => ({
     question: result.name,

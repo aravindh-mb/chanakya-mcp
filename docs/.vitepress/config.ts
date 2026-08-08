@@ -10,6 +10,7 @@ export default defineConfig({
     logo: '/logo.svg',
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
+      { text: 'Benchmarks', link: '/guide/benchmarks' },
       { text: 'Reference', link: '/reference/mcp-tools' },
       { text: 'Roadmap', link: '/roadmap' },
       {
@@ -27,6 +28,7 @@ export default defineConfig({
           { text: 'Code Model & Extraction', link: '/guide/code-model' },
           { text: 'Search', link: '/guide/search' },
           { text: 'Edits', link: '/guide/edits' },
+          { text: 'Benchmarks', link: '/guide/benchmarks' },
           { text: 'Security', link: '/guide/security' },
         ],
       },

@@ -55,7 +55,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "pnpm run typecheck && pnpm run lint && pnpm run test",
-    "prepublishOnly": "pnpm run build"
+    "prepublishOnly": "pnpm run build",
+    "bench:sample": "pnpm run build && node bench/sample.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",
