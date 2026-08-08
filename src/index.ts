@@ -134,16 +134,30 @@ export {
   type reference_hit,
 } from './navigation/types.js';
 
+export { get_dependencies, get_dependents, type graph_options } from './graph/graph.js';
+export {
+  type dependencies_result,
+  type dependents_result,
+  type dependency_hit,
+  type dependent_hit,
+} from './graph/types.js';
+
+export {
+  get_symbol_context,
+  type context_call,
+  type context_dependent,
+  type context_reference_file,
+  type context_symbol_ref,
+  type symbol_context_options,
+  type symbol_context_result,
+} from './context/symbol_context.js';
+
 export {
   extract_symbols,
   type extract_symbols_options,
   type extracted_symbols,
 } from './extract/symbol_extractor.js';
-export {
-  extract_file,
-  type extract_file_options,
-  type extracted_file,
-} from './extract/extract_file.js';
+export { extract_file, type extract_file_options, type extracted_file } from './extract/extract_file.js';
 export { extract_imports, type extract_imports_options } from './extract/import_extractor.js';
 export { extract_exports, type extract_exports_options } from './extract/export_extractor.js';
 export { extract_references, type extract_references_options } from './extract/reference_extractor.js';
@@ -193,3 +207,32 @@ export {
 export { parse_args } from './cli/parse_args.js';
 export { run_cli, BINARY_NAME, type run_cli_options } from './cli/run_cli.js';
 export { EXIT_CODE, type cli_options, type exit_code } from './cli/types.js';
+
+export { mcp_server, type mcp_server_options } from './mcp/server.js';
+export { run_mcp_server, type run_mcp_server_options } from './mcp/run.js';
+export { list_tools, tool_error, type mcp_tool, type tool_context } from './mcp/tools.js';
+
+export {
+  apply_patch,
+  type apply_patch_edit,
+  type apply_patch_options,
+  type apply_patch_result,
+} from './edit/apply_patch.js';
+export {
+  replace_symbol,
+  type replace_symbol_options,
+  type replace_symbol_result,
+} from './edit/replace_symbol.js';
+export {
+  rename_symbol,
+  type rename_file_result,
+  type rename_symbol_options,
+  type rename_symbol_result,
+} from './edit/rename_symbol.js';
+export {
+  build_line_offsets,
+  position_to_offset,
+  read_current_file,
+  resolve_project_path,
+  write_project_file,
+} from './edit/project_file.js';

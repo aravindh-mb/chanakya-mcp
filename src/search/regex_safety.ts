@@ -12,16 +12,14 @@
  * any cap worth having. Nor does a wall-clock budget checked between lines or
  * files, because the engine never yields during a single failing match.
  *
- * So the pattern is inspected before it ever runs, and the dangerous shape is
- * refused with an explanation.
- *
  * **This is a heuristic, and it is honest about that.** It catches the nested
  * quantifier family, which is what an agent or a person writes by accident. It
  * does not catch every pathological pattern — overlapping alternations such as
- * `(a|a)+` can also backtrack badly. The complete fix is to run matching in a
- * worker thread that can be terminated, which is scheduled for the security
- * phase. Until then this package assumes the pattern comes from a cooperating
- * client, not an attacker.
+ * `(a|a)+` can also backtrack badly. Everything the heuristic misses runs in a
+ * worker thread (`pattern.ts`) that the time budget terminates, so even those
+ * patterns are bounded. This fast rejection exists to catch the common case
+ * with a better message than a timeout, and to avoid paying for a worker at
+ * all.
  */
 
 import { code_intelligence_error } from '../core/errors.js';

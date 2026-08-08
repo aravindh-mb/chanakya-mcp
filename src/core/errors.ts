@@ -19,6 +19,7 @@ export type error_code =
   | 'index_unavailable'
   | 'watch_unavailable'
   | 'unsafe_pattern'
+  | 'search_timeout'
   | 'internal_error';
 
 export interface error_options {

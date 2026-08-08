@@ -10,12 +10,18 @@
  * Every match is annotated with the symbol whose body encloses it. That is the
  * part a plain grep cannot provide, and it is frequently enough for an agent to
  * decide without opening the file at all.
+ *
+ * Regex matching runs in a worker thread (see `pattern.ts`). A batch of lines
+ * is sent to the worker, the worker answers with match columns, and if the
+ * worker does not answer within the remaining time budget it is **terminated** —
+ * the one thing that can interrupt an exponential backtrace, because the engine
+ * never yields on its own. The search then stops and reports `timed_out`.
  */
 
 import { readFile } from 'node:fs/promises';
 import type { code_symbol } from '../model/symbol.js';
 import type { index_store } from '../store/index_store.js';
-import { build_line_matcher } from './pattern.js';
+import { build_line_matcher, type line_matcher } from './pattern.js';
 import { escape_like } from './pattern.js';
 import {
   DEFAULT_CODE_LIMIT,
@@ -56,68 +62,125 @@ export async function search_code(
   let timed_out = false;
   let truncated = false;
 
-  for (const file of files) {
-    if (matches.length >= limit) {
-      truncated = true;
-      break;
-    }
-    // Checked between files rather than between lines: a per-line check would
-    // cost more than the matching itself.
-    if (Date.now() > deadline) {
-      timed_out = true;
-      break;
-    }
+  try {
+    for (const file of files) {
+      if (matches.length >= limit) {
+        truncated = true;
+        break;
+      }
+      // Checked between files rather than between lines: a per-line check would
+      // cost more than the matching itself. A batch that overruns is stopped by
+      // the deadline below, which terminates the worker.
+      if (Date.now() > deadline) {
+        timed_out = true;
+        break;
+      }
 
-    let source: string;
-    try {
-      source = await readFile(file.absolute_path, 'utf8');
-    } catch {
-      // The file was deleted or became unreadable since indexing. Skipping is
-      // correct; the next index run will drop it.
-      continue;
-    }
+      let source: string;
+      try {
+        source = await readFile(file.absolute_path, 'utf8');
+      } catch {
+        // The file was deleted or became unreadable since indexing. Skipping is
+        // correct; the next index run will drop it.
+        continue;
+      }
 
-    files_searched += 1;
-    const found = search_one_file(source, matcher, per_file, limit - matches.length, context_lines);
-    if (found.length === 0) {
-      continue;
-    }
+      files_searched += 1;
+      const lines = source.split('\n');
+      const columns = await match_batch_with_deadline(matcher, lines, deadline);
+      if (columns === undefined) {
+        timed_out = true;
+        break;
+      }
 
-    // Loaded once per file with matches, not once per match.
-    const symbols = store.get_symbols_in_file(file.file_path);
-    for (const item of found) {
-      const enclosing = find_enclosing_symbol(symbols, item.line);
-      matches.push({
-        file_path: file.file_path,
-        ...item,
-        ...(enclosing === undefined ? {} : { enclosing }),
-      });
+      const found = found_from_columns(columns, lines, per_file, limit - matches.length, context_lines);
+      if (found.length === 0) {
+        continue;
+      }
+
+      // Loaded once per file with matches, not once per match.
+      const symbols = store.get_symbols_in_file(file.file_path);
+      for (const item of found) {
+        const enclosing = find_enclosing_symbol(symbols, item.line);
+        matches.push({
+          file_path: file.file_path,
+          ...item,
+          ...(enclosing === undefined ? {} : { enclosing }),
+        });
+      }
     }
+  } finally {
+    await matcher.dispose();
   }
 
   return { matches, files_searched, truncated, timed_out };
 }
 
+/**
+ * Match a file's lines, racing the worker against the time budget.
+ *
+ * Returns `undefined` when the budget ran out mid-batch. The worker is left to
+ * `dispose()`, which terminates it mid-match — the only way to stop a
+ * backtracking engine, which never yields on its own.
+ */
+async function match_batch_with_deadline(
+  matcher: line_matcher,
+  lines: readonly string[],
+  deadline: number,
+): Promise<number[] | undefined> {
+  const remaining = deadline - Date.now();
+  if (remaining <= 0) {
+    return undefined;
+  }
+
+  try {
+    return await race_with_timeout(matcher.find_all(lines), remaining);
+  } catch (error) {
+    if (error instanceof search_timeout_error) {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+function race_with_timeout<value_type>(promise: Promise<value_type>, ms: number): Promise<value_type> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new search_timeout_error()), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
+/** Internal marker for "the budget ran out", distinct from real failures. */
+class search_timeout_error extends Error {}
+
 type file_match = Omit<code_match, 'file_path' | 'enclosing'>;
 
-function search_one_file(
-  source: string,
-  matcher: { find(line: string): number },
+function found_from_columns(
+  columns: readonly number[],
+  lines: readonly string[],
   per_file: number,
   remaining: number,
   context_lines: number,
 ): file_match[] {
-  const lines = source.split('\n');
   const found: file_match[] = [];
   const cap = Math.min(per_file, remaining);
 
-  for (let index = 0; index < lines.length && found.length < cap; index += 1) {
-    const line = lines[index] as string;
-    const column = matcher.find(line);
+  for (let index = 0; index < columns.length && found.length < cap; index += 1) {
+    const column = columns[index] as number;
     if (column === -1) {
       continue;
     }
 
+    const line = lines[index] as string;
     found.push({
       line: index + 1,
       column: column + 1,

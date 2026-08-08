@@ -7,12 +7,14 @@ import { describe_unknown_error, is_code_intelligence_error } from '../core/erro
 import { create_logger, type logger } from '../core/logger.js';
 import { read_package_meta } from '../core/package_meta.js';
 import { resolve_project_root, type project_root } from '../core/project_root.js';
-import { index_project } from '../indexer/index_project.js';
+import { index_project, type index_project_result } from '../indexer/index_project.js';
 import { watch_project } from '../indexer/watch_project.js';
+import { run_mcp_server } from '../mcp/run.js';
 import { index_store } from '../store/index_store.js';
 import { build_help_text } from './help_text.js';
 import { parse_args } from './parse_args.js';
 import { EXIT_CODE, type cli_options as cli_options_type, type exit_code } from './types.js';
+import type { Readable } from 'node:stream';
 
 export const BINARY_NAME = 'code-intelligence-mcp';
 
@@ -24,6 +26,8 @@ export interface run_cli_options {
   /** Diagnostics sink. */
   readonly write_stderr?: (text: string) => void;
   readonly cwd?: string;
+  /** Client stream for the MCP server. Defaults to process.stdin. */
+  readonly stdin?: Readable;
 }
 
 export async function run_cli(options: run_cli_options): Promise<exit_code> {
@@ -59,9 +63,7 @@ export async function run_cli(options: run_cli_options): Promise<exit_code> {
     logger.info(`project root: ${root.root_path}`);
     logger.debug(`data directory: ${root.data_dir_path}`);
 
-    await run_indexing(root, meta.version, cli_options, logger);
-
-    logger.info('ok - the MCP server is not implemented yet (phase 7 of 20)');
+    await run_indexing(root, meta.name, meta.version, cli_options, logger, write_stdout, options.stdin);
 
     return EXIT_CODE.success;
   } catch (error: unknown) {
@@ -84,9 +86,12 @@ export async function run_cli(options: run_cli_options): Promise<exit_code> {
  */
 async function run_indexing(
   root: project_root,
+  tool_name: string,
   tool_version: string,
   cli_options: cli_options_type,
   log: logger,
+  write_stdout: (text: string) => void,
+  stdin: Readable | undefined,
 ): Promise<void> {
   const store = index_store.open({
     data_dir_path: root.data_dir_path,
@@ -123,10 +128,61 @@ async function run_indexing(
     }
     if (cli_options.watch) {
       await watch_until_interrupted(root, store, log);
+    } else {
+      await serve_until_input_closes(root, tool_name, tool_version, store, log, write_stdout, stdin);
     }
   } finally {
     store.close();
   }
+}
+
+/**
+ * Serve the MCP protocol on stdio until the client closes the input.
+ *
+ * A Ctrl+C (or SIGTERM) destroys the input stream so the server loop ends the
+ * same way a closed connection would, letting the `finally` above close the
+ * database. Signal handlers are only installed when talking to a real stdin;
+ * injected streams are test doubles and need no wiring.
+ */
+async function serve_until_input_closes(
+  root: project_root,
+  tool_name: string,
+  tool_version: string,
+  store: index_store,
+  log: logger,
+  write_stdout: (text: string) => void,
+  stdin: Readable | undefined,
+): Promise<void> {
+  const input = stdin ?? process.stdin;
+  log.info('serving MCP on stdio - close the client connection to stop');
+
+  if (stdin === undefined) {
+    stop_on_signal(input);
+  }
+
+  const reindex = (): Promise<index_project_result> =>
+    index_project({ store, root_path: root.root_path, logger: log });
+
+  await run_mcp_server({
+    server_name: tool_name,
+    server_version: tool_version,
+    store,
+    root_path: root.root_path,
+    reindex,
+    input,
+    output_write: write_stdout,
+  });
+}
+
+function stop_on_signal(input: Readable): void {
+  const stop = (): void => {
+    process.off('SIGINT', stop);
+    process.off('SIGTERM', stop);
+    input.destroy();
+  };
+
+  process.once('SIGINT', stop);
+  process.once('SIGTERM', stop);
 }
 
 /**

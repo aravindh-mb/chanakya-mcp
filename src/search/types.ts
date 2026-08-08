@@ -63,7 +63,11 @@ export interface search_code_options {
   readonly max_matches_per_file?: number;
   /** Lines of surrounding source to include. Default 0. */
   readonly context_lines?: number;
-  /** Give up after this long. Guards against a pathological pattern. */
+  /**
+   * Give up after this long. Regex matching runs in a worker thread that is
+   * terminated when the budget runs out, so even a pathological pattern cannot
+   * hang the server — the search stops and reports `timed_out`.
+   */
   readonly time_budget_ms?: number;
 }
 

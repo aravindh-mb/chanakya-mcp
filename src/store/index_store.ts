@@ -117,6 +117,7 @@ interface prepared_statements {
   readonly select_symbols_by_parent: Statement;
   readonly select_file_paths: Statement;
   readonly select_imports_by_file: Statement;
+  readonly select_imports_resolved_to: Statement;
   readonly select_exports_by_file: Statement;
   readonly select_references_by_name: Statement;
   readonly select_references_to: Statement;
@@ -327,6 +328,15 @@ export class index_store {
 
   get_imports_in_file(file_path: string): readonly code_import[] {
     const rows = this.#statements.select_imports_by_file.all(file_path) as import_row[];
+    return rows.map(to_code_import);
+  }
+
+  /**
+   * Imports whose specifier resolved to `file_path` — the reverse dependency
+   * edge. Backs get_dependents: who pulls this module in.
+   */
+  get_imports_resolved_to(file_path: string): readonly code_import[] {
+    const rows = this.#statements.select_imports_resolved_to.all(file_path) as import_row[];
     return rows.map(to_code_import);
   }
 
@@ -684,6 +694,9 @@ function prepare_statements(db: database_handle): prepared_statements {
     select_symbols_by_parent: db.prepare('SELECT * FROM symbols WHERE parent_id = ? ORDER BY start_line'),
     select_file_paths: db.prepare('SELECT file_path FROM files ORDER BY file_path'),
     select_imports_by_file: db.prepare('SELECT * FROM imports WHERE file_path = ? ORDER BY line'),
+    select_imports_resolved_to: db.prepare(
+      'SELECT * FROM imports WHERE resolved_path = ? ORDER BY file_path, line',
+    ),
     select_exports_by_file: db.prepare('SELECT * FROM exports WHERE file_path = ? ORDER BY line'),
     select_references_by_name: db.prepare(
       `SELECT * FROM ${REFERENCES_TABLE} WHERE name = ? ORDER BY file_path, line LIMIT ?`,

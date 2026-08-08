@@ -159,6 +159,37 @@ describe('search_code regex search', () => {
 
     expect(result.matches.every((match) => match.file_path !== 'src/generated.ts')).toBe(true);
   });
+
+  it('terminates a pathological pattern the static check misses', async () => {
+    // `(a|a)+$` defeats the nested-quantifier heuristic, and against a failing
+    // line it backtracks exponentially — measured: a 500 character line has not
+    // answered after minutes. Matching runs in a worker thread, so the time
+    // budget terminates it instead of hanging the server.
+    project.write_file('src/pathological.ts', `const blob = "${'a'.repeat(400)}b";\n`);
+    await index_project({ store, root_path: project.root_path });
+    const started_at = Date.now();
+
+    const result = await search_code(store, {
+      query: '(a|a)+$',
+      is_regex: true,
+      time_budget_ms: 500,
+    });
+
+    expect(result.timed_out).toBe(true);
+    expect(Date.now() - started_at).toBeLessThan(10_000);
+  });
+
+  it('searches normally again after a timed-out search', async () => {
+    project.write_file('src/pathological.ts', `const blob = "${'a'.repeat(400)}b";\n`);
+    await index_project({ store, root_path: project.root_path });
+
+    await search_code(store, { query: '(a|a)+$', is_regex: true, time_budget_ms: 500 });
+
+    const result = await search_code(store, { query: '^export class', is_regex: true });
+
+    expect(result.timed_out).toBe(false);
+    expect(result.matches).toHaveLength(1);
+  });
 });
 
 describe('search_code enclosing symbol', () => {

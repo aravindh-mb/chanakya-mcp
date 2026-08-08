@@ -3,10 +3,11 @@
 A local [MCP](https://modelcontextprotocol.io) server that gives AI coding agents — Claude Code, Cursor,
 and any other MCP-compatible client — deep structural knowledge of a JavaScript/TypeScript codebase.
 
-> **Status: early development.** Phases 1–8 of 20 are implemented: package foundation, CLI, project
+> **Status: early development.** Phases 1–13 of 20 are implemented: package foundation, CLI, project
 > scanner, tree-sitter parsing, the normalized code model, symbol extraction, the SQLite index,
-> incremental indexing with a file watcher, and lexical search. Navigation and the MCP server are not
-> implemented yet. See [Roadmap](#roadmap).
+> incremental indexing with a file watcher, lexical search, navigation, the module dependency graph,
+> the MCP server over stdio, safe + symbol-aware edit tools, and worker-thread regex safety with a
+> terminable time budget. See [Roadmap](#roadmap).
 
 ## Why this exists
 
@@ -65,7 +66,7 @@ Exit codes: `0` success, `1` runtime error, `2` usage error.
 
 ## Claude Code setup
 
-_Available once the MCP server lands (Phase 11)._ The intended configuration:
+The server talks MCP over stdio: index the project, then point Claude at the binary:
 
 ```bash
 claude mcp add code-intelligence -- npx -y @code-intelligence/mcp /path/to/project
@@ -73,7 +74,7 @@ claude mcp add code-intelligence -- npx -y @code-intelligence/mcp /path/to/proje
 
 ## Cursor setup
 
-_Available once the MCP server lands (Phase 11)._ Add to `.cursor/mcp.json`:
+Add to `.cursor/mcp.json`:
 
 ```json
 {
@@ -332,28 +333,75 @@ inside another — `(a+)+`, `(\w*)*` — takes exponential time. This was **meas
 `(a+)+$` against a _30 character_ line takes 15 seconds, and every extra character roughly doubles it.
 
 That measurement rules out the obvious mitigations. A line-length cap does not help, because the blowup
-happens two orders of magnitude below any useful cap. Neither does a wall-clock budget, because the
-engine never yields during a single failing match. So such patterns are **rejected before they run**,
-with a message explaining how to rewrite them.
+happens two orders of magnitude below any useful cap. Neither does a wall-clock budget checked between
+lines or files, because the engine never yields during a single failing match.
 
-This is a heuristic and is documented as one. It catches the nested-quantifier family, which is what
-gets written by accident. It does not catch every pathological pattern — an overlapping alternation like
-`(a|a)+` can also backtrack badly. The complete fix is to run matching in a worker thread that can be
-terminated, which is scheduled for the security phase. Until then the package assumes a cooperating
-client rather than an attacker.
+So regex matching runs in a **worker thread**, and the time budget can **terminate** that thread. The
+engine cannot be interrupted from the main thread, but terminating the thread is not an interruption —
+it stops the whole worker, backtrace and all. A pathological pattern is therefore bounded: the search
+stops at the budget and reports `timed_out` instead of hanging the server.
+
+The nested-quantifier family is still **rejected before it runs**, because refusing costs less than a
+worker and gives a better error than a timeout. That check is a heuristic and is documented as one: it
+catches what gets written by accident, while the worker terminates everything it misses — an overlapping
+alternation like `(a|a)+` backtracks just as badly, and it is bounded by the same budget.
 
 Separately, all SQL is parameterised and `LIKE` wildcards in user queries are escaped, so searching for
 `%` finds the literal character instead of returning the entire index.
 
+## Module graph
+
+Navigation resolves within a symbol; the graph resolves across modules. **`get_dependencies`** answers
+what a file pulls in, and **`get_dependents`** answers what pulls it in — both grouped by target so two
+import lines of the same module read as one dependency.
+
+Dependencies are grouped exactly, never fuzzily. An import is a project file only when its specifier
+resolved during the graph pass: a package is reported as the bare specifier (`react`), an unresolvable
+relative import as the specifier it is (`./style.css`). A re-exporting barrel (`export * from './user'`)
+counts as a dependent of its source, because it genuinely depends on it without binding a name.
+
+## Symbol context
+
+The read-only tools answer one question each, so exploring a single symbol can mean several round trips.
+**`get_symbol_context`** answers them all at once, keyed by symbol id: the symbol itself, the chain of
+parents that contain it and the members it contains, how heavily it is referenced and in how many files,
+who calls it and what it calls, and what its file imports and is imported by.
+
+Every list in the result is capped — a symbol referenced from a hundred files does not ship all of them.
+A `total` field beside each list states the true count, and the lists are ordered by weight (members by
+source order, references and callers by usage), so what a model sees is the important part of the answer,
+not a random slice.
+
 ## MCP tools
 
-Planned tool surface — small and deliberately non-redundant:
+The server exposes fourteen tools, each validating its arguments with a zod schema that doubles as its
+JSON Schema `inputSchema`. Eleven are read-only:
 
 `search_symbols` · `search_code` · `get_symbol` · `get_file_structure` · `find_definition` ·
 `find_references` · `get_callers` · `get_callees` · `get_dependencies` · `get_dependents` ·
-`apply_patch` · `replace_symbol` · `rename_symbol`
+`get_symbol_context`
 
-None are implemented yet.
+They wrap the search, navigation, context and graph layers directly. Results carry locations, names and
+signatures — never file contents.
+
+**`get_symbol_context`** bundles the above questions into one result keyed by symbol id: what the symbol
+is, what contains it and what it contains, how heavily it is referenced and where, who calls it and what
+it calls, and what its file imports and is imported by. Every list is capped so one call cannot explode,
+and a `total` next to each capped list says how much was left out.
+
+Three edit tools write files and reindex automatically, and each is safe by construction:
+
+- **`apply_patch`** applies exact text replacements in order. An `old_text` that does not match, or
+  matches more than once, refuses the whole call rather than guessing.
+- **`replace_symbol`** splices new source over a symbol's declaration at the exact source range the index
+  recorded — no fuzzy matching.
+- **`rename_symbol`** renames a symbol at its declaration, every resolved reference, and the import and
+  export bindings that connect it to other files (including re-exports through barrels). Occurrences the
+  index could not resolve are left alone.
+
+Edits never escape the project root, and a file whose content drifted from the index since the last run
+refuses any edit to it — every edit requires a fresh index. Because the index refreshes on each edit, a
+second edit is checked against the state the first one produced.
 
 ## Architecture
 
@@ -386,7 +434,12 @@ src/
   extract/     syntax tree -> symbols and contains edges
   store/       sqlite schema, queries, row mapping
   indexer/     scan -> parse -> extract -> store
+  navigation/  find_definition, find_references, find_callers, find_callees
+  context/     get_symbol_context
+  graph/       get_dependencies, get_dependents
   search/      symbol and text search, regex safety
+  edit/        apply_patch, replace_symbol, rename_symbol
+  mcp/         stdio server: JSON-RPC protocol, tool registry
   index.ts     public library exports
 ```
 
@@ -478,11 +531,12 @@ npm publish --access public
 | 6     | SQLite index              | Done   |
 | 7     | Incremental indexing      | Done   |
 | 8     | Code search               | Done   |
-| 9-10  | Navigation, graph         | Next   |
-| 11    | MCP server                | —      |
-| 12-13 | Safe + symbol-aware edits | —      |
-| 14-17 | Context, semantic, perf   | —      |
-| 18-20 | Security, docs, publish   | —      |
+| 9     | Navigation                | Done   |
+| 10    | Relationship graph        | Done   |
+| 11    | MCP server                | Done   |
+| 12-13 | Safe + symbol-aware edits | Done   |
+| 14-17 | Context, semantic, perf   | Next   |
+| 18-20 | Security, docs, publish   | Partly (regex worker) |
 
 ## License
 
