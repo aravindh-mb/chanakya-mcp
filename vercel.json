@@ -1,0 +1,8 @@
+﻿{
+    "outputDirectory":  "docs/.vitepress/dist",
+    "buildCommand":  "pnpm run docs:build",
+    "env":  {
+                "CI":  "true"
+            },
+    "framework":  "vitepress"
+}
