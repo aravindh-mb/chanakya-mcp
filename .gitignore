@@ -27,3 +27,4 @@ npm-debug.log*
 !.env.example
 docs/.vitepress/cache/
 docs/.vitepress/dist/
+.vercel
