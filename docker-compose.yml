@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  chanakya-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./project-to-scan:/workspace
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+    entrypoint: node /app/dist/cli/main.js
+    command: ["."]
