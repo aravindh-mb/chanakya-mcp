@@ -3,7 +3,7 @@ layout: home
 
 hero:
   name: Chanakya MCP
-  text: Structural Intelligence — Not AI Guesswork
+  text: Structural Intelligence
   tagline: Pure compiler-grade AST static analysis and relational SQLite indexing for AI coding agents. Zero embeddings, zero LLM hallucinations, and zero network calls.
   image:
     src: /logo.svg
@@ -20,7 +20,7 @@ hero:
       link: /guide/benchmarks
 
 features:
-  - title: Pure Structural Intelligence (Not AI)
+  - title: Pure Structural Intelligence
     details: Built on native Tree-Sitter AST parsing and SQLite relational graphs. Zero probabilistic guessing, zero embeddings, and zero hallucinations.
   - title: 95% Token Reduction
     details: Coding agents receive small, structured, exact answers in ~0.05ms instead of burning thousands of context tokens reading entire raw files.
@@ -39,14 +39,14 @@ features:
 <div style="text-align: center; margin: 1.5rem 0 0.5rem;">
   <div class="green-highlight-badge">
     <span class="pulsing-green-dot"></span>
-    <span class="green-glow-text">Zero network calls</span> &bull; 100% Deterministic Structural Intelligence (Not AI)
+    <span class="green-glow-text">Zero network calls</span> &bull; 100% Deterministic Structural Intelligence
   </div>
 </div>
 
 <div class="custom-banner">
   <div class="custom-banner-icon">⚡</div>
   <div class="custom-banner-content">
-    <h4>Deterministic Structural Code Intelligence — Not AI Guesswork</h4>
+    <h4>Deterministic Structural Code Intelligence</h4>
     <p>Chanakya MCP does not guess, hallucinate, or generate probabilistic embeddings. It compiles concrete syntax trees (AST) into high-speed SQLite relational graphs with <span class="green-glow-text">Zero network calls</span>.</p>
   </div>
 </div>
@@ -82,21 +82,13 @@ Connect Chanakya MCP to your favorite AI coding assistant in seconds over standa
 
 ---
 
-## How It Works: Interactive Execution Animation
-
-Watch how Chanakya MCP executes from the moment an AI agent invokes an MCP tool over standard input/output (`stdio`), to AST parsing, symbol extraction, relational SQLite indexing, and sub-millisecond 360° context delivery:
-
-<McpFlowAnimation />
-
----
-
 ## System Architecture
 
 Chanakya MCP operates as a deterministic compiler-grade pipeline: scanning files with `.gitignore` cascade support, parsing with native Tree-Sitter grammars, extracting language-agnostic code models, and querying a high-speed SQLite relational index.
 
 <div class="doc-image-card">
-  <img src="/mcp-execution-animation.svg" alt="Chanakya MCP End-to-End Execution Flow" />
-  <div class="doc-image-caption">Complete System Architecture: Tool Calling → Scanner → Tree-Sitter AST → Relational SQLite Store → 360° Context Engine</div>
+  <img src="/architecture-diagram.svg" alt="Chanakya MCP Architecture Overview" />
+  <div class="doc-image-caption">Complete System Architecture: Scanner → Tree-Sitter → Model Extraction → SQLite Index → MCP Engine</div>
 </div>
 
 ---

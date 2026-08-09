@@ -1,9 +1,9 @@
-﻿# Performance & Token Benchmarks
+# Performance & Token Benchmarks
 
 To accurately measure the real-world value of Chanakya MCP, we ran a series of head-to-head benchmarks comparing standard coding agent workflows with and without the MCP server.
 
 <div class="custom-banner">
-  <div class="custom-banner-icon">ðŸ“Š</div>
+  <div class="custom-banner-icon">📊</div>
   <div class="custom-banner-content">
     <h4>Empirical Token & Latency Measurements</h4>
     <p>Measured on a full-stack monorepo (Express backend, React frontend, shared TypeScript package). Median of 11 runs.</p>
@@ -34,14 +34,14 @@ To determine the answer, a standard agent must read the full matched source file
 
 | Question Scenario | With Chanakya MCP | Without MCP (Grep + Reads) | Raw Grep Lines | Files Inspected | Token Reduction |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Where is `create_user` defined?** | 119 tokens | 680 tokens | 57 | 2 | **82.5% â†“** |
-| **Everything that uses `format_money`** | 150 tokens | 569 tokens | 115 | 3 | **73.7% â†“** |
-| **Who calls `user_service.create_user`?** | 23 tokens | 680 tokens | 57 | 2 | **96.7% â†“** |
-| **What does `user_service` depend on?** | 167 tokens | 298 tokens | â€” | 1 | **44.0% â†“** |
-| **What breaks if I change shared types?** | 23 tokens | 1,568 tokens | 254 | 8 | **98.5% â†“** |
-| **Which components use the orders hook?** | 143 tokens | 389 tokens | 88 | 2 | **63.3% â†“** |
-| **Full working context for `user_service`** | 582 tokens | 1,006 tokens | â€” | 4 | **42.2% â†“** |
-| **Total Context Consumed** | **1,207 tokens** | **5,190 tokens** | â€” | â€” | **76.7% Net Savings** |
+| **Where is `create_user` defined?** | 119 tokens | 680 tokens | 57 | 2 | **82.5% ↓** |
+| **Everything that uses `format_money`** | 150 tokens | 569 tokens | 115 | 3 | **73.7% ↓** |
+| **Who calls `user_service.create_user`?** | 23 tokens | 680 tokens | 57 | 2 | **96.7% ↓** |
+| **What does `user_service` depend on?** | 167 tokens | 298 tokens | — | 1 | **44.0% ↓** |
+| **What breaks if I change shared types?** | 23 tokens | 1,568 tokens | 254 | 8 | **98.5% ↓** |
+| **Which components use the orders hook?** | 143 tokens | 389 tokens | 88 | 2 | **63.3% ↓** |
+| **Full working context for `user_service`** | 582 tokens | 1,006 tokens | — | 4 | **42.2% ↓** |
+| **Total Context Consumed** | **1,207 tokens** | **5,190 tokens** | — | — | **76.7% Net Savings** |
 
 ---
 

@@ -12,14 +12,6 @@ Chanakya MCP is engineered around a clean, layered compiler pipeline that decoup
 
 ---
 
-## Interactive End-to-End Execution Animation
-
-Experience the full lifecycle of a tool call: from the AI agent's JSON-RPC 2.0 stdio request, to AST parsing, symbol extraction, relational SQLite storage, and sub-millisecond 360° context delivery.
-
-<McpFlowAnimation />
-
----
-
 ## The 5-Stage Execution Pipeline
 
 ```

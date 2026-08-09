@@ -1,9 +1,9 @@
-﻿# Getting Started
+# Getting Started
 
 **Chanakya MCP** is a high-performance local [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server that provides AI coding agents with deep structural AST knowledge of JavaScript and TypeScript projects.
 
 <div class="custom-banner">
-  <div class="custom-banner-icon">ðŸš€</div>
+  <div class="custom-banner-icon">🚀</div>
   <div class="custom-banner-content">
     <h4>Zero-Configuration Local Intelligence</h4>
     <p>Everything runs on your machine. No source code leaves your local environment, and no external AI or embedding API keys are required.</p>
@@ -85,7 +85,7 @@ chanakya-mcp /path/to/project --verbose
 | **Log Level** | `--log-level` | Diagnostic logging level: `silent`, `error`, `warn`, `info`, `debug`. | `info` |
 | **Verbose** | `--verbose` | Shorthand for `--log-level debug`. | `false` |
 | **Quiet** | `--quiet` | Shorthand for `--log-level error`. | `false` |
-| **Help & Version** | `-h`, `--help` / `-v`, `--version` | Displays usage instructions or current semver version. | â€” |
+| **Help & Version** | `-h`, `--help` / `-v`, `--version` | Displays usage instructions or current semver version. | — |
 
 ::: tip PROTOCOL RESERVATION
 `stdout` is strictly reserved for the MCP JSON-RPC protocol. All logs, index progress stats, and diagnostics are written to `stderr` to prevent protocol corruption.

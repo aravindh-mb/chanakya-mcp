@@ -3,7 +3,7 @@
 <div align="center">
 
 # Chanakya MCP 🧠⚡
-### Deterministic Structural Code Intelligence for AI Agents (Not AI Guesswork)
+### Deterministic Structural Code Intelligence for AI Agents
 
 [![npm version](https://img.shields.io/npm/v/@aravindh-arumugam/chanakya-mcp?color=38bdf8&style=flat-square)](https://www.npmjs.com/package/@aravindh-arumugam/chanakya-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-10b981.svg?style=flat-square)](./LICENSE)
@@ -12,13 +12,13 @@
 
 **A high-performance local [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server that equips AI coding agents (Claude Code, Cursor, Windsurf, Roo Code, Cline) with deep structural AST knowledge of JavaScript and TypeScript codebases.**
 
-[Quickstart](#quickstart) • [Why Structural Intelligence?](#why-structural-intelligence-not-ai) • [Agent Setup](#ai-agent-setup) • [14 MCP Tools](#14-mcp-tools) • [Benchmarks](#performance--benchmarks) • [Architecture](#architecture)
+[Quickstart](#quickstart) • [Why Structural Intelligence?](#why-structural-intelligence) • [Agent Setup](#ai-agent-setup) • [14 MCP Tools](#14-mcp-tools) • [Benchmarks](#performance--benchmarks) • [Architecture](#architecture)
 
 </div>
 
 ---
 
-## Why Structural Intelligence? (Not AI / Not Embeddings)
+## Why Structural Intelligence?
 
 Coding agents traditionally explore repositories by running `grep` and reading entire source files. That approach is slow, burns thousands of context tokens on irrelevant boilerplate, and vector embeddings frequently hallucinate approximate matches without syntactic guarantees.
 
@@ -222,24 +222,20 @@ Language detection is deterministic and based on file extension:
 
 ## Architecture
 
-<div align="center">
-  <img src="./docs/public/mcp-execution-animation.svg" alt="Chanakya MCP End-to-End Execution Flow" width="100%" />
-</div>
-
 ```
-[1] AI Agent Tool Call (stdio stdin)
+Project Files on Disk
        ↓
-[2] File Scanner & .gitignore Cascade      (src/scanner/)
+[1] File Scanner & .gitignore Cascade      (src/scanner/)
        ↓
-[3] Native Tree-Sitter AST Parser          (src/parser/)
+[2] Native Tree-Sitter Parser             (src/parser/)
        ↓
-[4] Normalized Code Model & Extraction     (src/model/, src/extract/)
+[3] Normalized Code Model & Extraction    (src/model/, src/extract/)
        ↓
-[5] Relational SQLite Database Store       (src/store/, src/indexer/)
+[4] Relational SQLite Database Store       (src/store/, src/indexer/)
        ↓
-[6] Navigation, Graph & Search Engines     (src/navigation/, src/search/, src/graph/)
+[5] Navigation, Graph & Search Engines    (src/navigation/, src/search/, src/graph/)
        ↓
-[7] MCP Stdio Protocol & Safe Edits        (src/mcp/, src/edit/)
+[6] MCP Stdio Protocol & Safe Edits        (src/mcp/, src/edit/)
        ↓
 AI Coding Clients (Claude Code, Cursor, Windsurf, Cline)
 ```

@@ -1,4 +1,4 @@
-﻿import { defineConfig } from 'vitepress';
+import { defineConfig } from 'vitepress';
 
 export default defineConfig({
   title: 'Chanakya MCP',
@@ -83,8 +83,8 @@ export default defineConfig({
     },
 
     footer: {
-      message: 'Released under the MIT License. Zero data telemetry â€” 100% local execution.',
-      copyright: 'Copyright Â© 2026 Chanakya MCP Contributors',
+      message: 'Released under the MIT License. Zero data telemetry — 100% local execution.',
+      copyright: 'Copyright © 2026 Chanakya MCP Contributors',
     },
 
     search: {

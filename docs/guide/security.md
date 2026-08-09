@@ -1,9 +1,9 @@
-﻿# Security & Sandboxing
+# Security & Sandboxing
 
 Chanakya MCP operates under a **Zero-Trust, Zero-Network local model**. It executes on your machine, interacts only with the codebase you choose to open, and exposes structured AST metadata exclusively over local `stdio`.
 
 <div class="custom-banner">
-  <div class="custom-banner-icon">ðŸ”’</div>
+  <div class="custom-banner-icon">🔒</div>
   <div class="custom-banner-content">
     <h4>100% Air-Gapped & Private</h4>
     <p>Zero telemetry, zero cloud dependencies, zero tracking. No OpenAI, Anthropic, or external embedding API keys are ever needed or contacted.</p>
@@ -32,7 +32,7 @@ Every relative or absolute path passed to an MCP tool is strictly validated:
 2. **Canonical Realpath Check:** Resolves symbolic links and junctions against the filesystem to guarantee that the target file does not reside outside the project directory.
 
 ::: warning SYMLINKS OUTSIDE PROJECT ROOT
-If a symbolic link inside your repository points to `/etc/passwd` or an external directory, Codebrain detects the out-of-bounds target and rejects it immediately.
+If a symbolic link inside your repository points to `/etc/passwd` or an external directory, Chanakya MCP detects the out-of-bounds target and rejects it immediately.
 :::
 
 ---
@@ -63,4 +63,3 @@ const escaped_query = query.replace(/[%_\\]/g, '\\$&');
 ## Security Reporting
 
 If you discover a security vulnerability, please submit a private report via GitHub Security Advisories or open an issue on the repository. Security patches are prioritized and released promptly.
-

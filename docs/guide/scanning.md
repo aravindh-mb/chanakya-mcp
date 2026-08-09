@@ -1,12 +1,12 @@
-﻿# Scanning & Language Grammars
+# Scanning & Language Grammars
 
 Chanakya MCP features a high-performance repository scanner paired with **native Tree-Sitter grammars**. It parses files into concrete syntax trees without spawning separate compiler processes.
 
 <div class="custom-banner">
-  <div class="custom-banner-icon">âš¡</div>
+  <div class="custom-banner-icon">⚡</div>
   <div class="custom-banner-content">
     <h4>Native N-API Prebuilds</h4>
-    <p>Zero WASM overhead. Codebrain ships native precompiled Tree-Sitter binaries across macOS, Linux, and Windows for both x64 and arm64 architectures.</p>
+    <p>Zero WASM overhead. Chanakya MCP ships native precompiled Tree-Sitter binaries across macOS, Linux, and Windows for both x64 and arm64 architectures.</p>
   </div>
 </div>
 
@@ -24,14 +24,14 @@ Language detection is deterministic and based on file extension:
 | **TSX** | `.tsx` | Extension | Tree-Sitter | `tree-sitter-typescript` (tsx dialect) |
 
 ::: tip GRAMMAR SEPARATION
-Tree-Sitter's JavaScript grammar parses JSX natively. However, TypeScript requires separate grammars for `.ts` vs `.tsx` due to syntactic ambiguities with generic type arguments (`<T>() => ...`) vs JSX tags (`<T>...</T>`). Codebrain selects the exact grammar variant automatically.
+Tree-Sitter's JavaScript grammar parses JSX natively. However, TypeScript requires separate grammars for `.ts` vs `.tsx` due to syntactic ambiguities with generic type arguments (`<T>() => ...`) vs JSX tags (`<T>...</T>`). Chanakya MCP selects the exact grammar variant automatically.
 :::
 
 ---
 
 ## Native Parsing vs WASM
 
-Many web-based or JavaScript tools rely on `web-tree-sitter` (WASM). Codebrain intentionally uses native **N-API bindings**:
+Many web-based or JavaScript tools rely on `web-tree-sitter` (WASM). Chanakya MCP intentionally uses native **N-API bindings**:
 
 - **No compilation step:** Prebuilt binaries run immediately with `npx`.
 - **Modern TypeScript features:** Parses modern constructs such as `accessor` keywords, stage-3 decorators, and `using` declarations without failing.
@@ -43,7 +43,7 @@ Many web-based or JavaScript tools rely on `web-tree-sitter` (WASM). Codebrain i
 
 Real-world codebases often have syntax errors, uncommitted merge conflicts, or incomplete edits. 
 
-**Codebrain never abandons a file due to syntax errors.** The parser performs error-tolerant node recovery:
+**Chanakya MCP never abandons a file due to syntax errors.** The parser performs error-tolerant node recovery:
 
 ```typescript
 // A file containing an unparseable typo still yields its valid AST declarations:
@@ -67,7 +67,7 @@ export class AccountService {
 
 ## Coordinate & Offset Guarantees
 
-To ensure complete compatibility with AI agents and code editors, Codebrain normalizes all coordinates at the parser boundary:
+To ensure complete compatibility with AI agents and code editors, Chanakya MCP normalizes all coordinates at the parser boundary:
 
 1. **1-Based Line & Column:** Converted from Tree-Sitter's 0-based format to standard 1-based editor coordinates.
 2. **UTF-16 Code Unit String Offsets:** String slicing (`source.slice(start_offset, end_offset)`) operates on JavaScript code units, ensuring exact character slicing even when files contain emojis, multi-byte Unicode characters, or international text.
@@ -83,4 +83,3 @@ The file scanner automatically honors repository ignore rules:
 - **Minified Files & Bundles:** Automatically ignores `*.min.js`, `*.bundle.js`, and `*.map`.
 - **File Size Cap:** Skips files exceeding 1 MiB to prevent heap saturation.
 - **Symlink Sandbox:** Symlinks are not followed outside the project root; all resolved targets are validated with realpath containment checks.
-

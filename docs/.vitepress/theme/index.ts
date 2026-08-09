@@ -4,7 +4,6 @@ import BenchChart from './BenchChart.vue';
 import AgentTabs from './AgentTabs.vue';
 import ToolPlayground from './ToolPlayground.vue';
 import HeroStars from './HeroStars.vue';
-import McpFlowAnimation from './McpFlowAnimation.vue';
 import './custom.css';
 
 /**
@@ -19,6 +18,5 @@ export default {
     ctx.app.component('AgentTabs', AgentTabs);
     ctx.app.component('ToolPlayground', ToolPlayground);
     ctx.app.component('HeroStars', HeroStars);
-    ctx.app.component('McpFlowAnimation', McpFlowAnimation);
   },
 } satisfies Theme;
