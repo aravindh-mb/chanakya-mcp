@@ -14,7 +14,7 @@
 
 ## Installation
 
-You can run Chanakya MCP on-demand using `npx`, or install it globally via your preferred package manager:
+Choose your preferred installation method:
 
 ::: code-group
 
@@ -35,6 +35,14 @@ chanakya-mcp /path/to/project
 
 ```bash [Project Dev Dependency]
 pnpm add -D @aravindh-arumugam/chanakya-mcp
+```
+
+```bash [Docker]
+# Pull the pre-built Docker image
+docker pull aravindharumugam/chanakya-mcp:latest
+
+# Run with Docker
+docker run -v /path/to/project:/workspace aravindharumugam/chanakya-mcp:latest .
 ```
 
 :::
@@ -105,7 +113,54 @@ You should see a clean indexing summary logged to `stderr`:
 
 ---
 
+## Docker Usage
+
+Run Chanakya MCP in a containerized environment without installing Node.js or npm:
+
+```bash
+# Basic usage - index current directory
+docker run -v $(pwd):/workspace aravindharumugam/chanakya-mcp:latest .
+
+# Index specific project path
+docker run -v /path/to/project:/workspace aravindharumugam/chanakya-mcp:latest /workspace
+
+# Enable watch mode for live reindexing
+docker run -v $(pwd):/workspace aravindharumugam/chanakya-mcp:latest . --watch
+
+# Verbose logging
+docker run -v $(pwd):/workspace aravindharumugam/chanakya-mcp:latest . --verbose
+```
+
+### Docker Compose
+
+For easier setup, use Docker Compose:
+
+```yaml
+version: '3.8'
+services:
+  chanakya-mcp:
+    image: aravindharumugam/chanakya-mcp:latest
+    volumes:
+      - ./my-project:/workspace
+    working_dir: /workspace
+    command: ["."]
+```
+
+Run with:
+```bash
+docker-compose up
+```
+
+**Benefits of Docker:**
+- ✓ No local Node.js installation required
+- ✓ Consistent environment across machines
+- ✓ Works on Linux, macOS, and Windows
+- ✓ Easy CI/CD integration
+- ✓ Isolated from system dependencies
+
+---
+
 ## Monorepos & Workspace Support
 
-Codebrain natively indexes full monorepos (Turborepo, Nx, Lerna, pnpm workspaces, and npm/yarn workspaces). It automatically resolves internal package dependencies (`@company/shared`, `@company/ui`) across workspace packages and indexes cross-package reference graphs.
+Chanakya MCP natively indexes full monorepos (Turborepo, Nx, Lerna, pnpm workspaces, and npm/yarn workspaces). It automatically resolves internal package dependencies (`@company/shared`, `@company/ui`) across workspace packages and indexes cross-package reference graphs.
 

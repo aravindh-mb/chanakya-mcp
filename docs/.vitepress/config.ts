@@ -50,6 +50,7 @@ export default defineConfig({
         collapsed: false,
         items: [
           { text: 'Overview & Quickstart', link: '/guide/getting-started' },
+          { text: 'Docker Deployment', link: '/guide/docker' },
           { text: 'Scanning & Grammars', link: '/guide/scanning' },
           { text: 'Code Model & AST Graph', link: '/guide/code-model' },
         ],
