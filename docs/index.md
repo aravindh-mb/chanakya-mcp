@@ -1,5 +1,8 @@
 ---
 layout: home
+title: Chanakya MCP - Deterministic Structural Code Intelligence for AI Agents
+titleTemplate: false
+description: Chanakya MCP is a local Model Context Protocol server delivering deep AST static analysis, call graphs, and 95% token reduction for Claude Code, Cursor, and Windsurf.
 
 hero:
   name: Chanakya MCP
