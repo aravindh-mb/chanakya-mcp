@@ -222,20 +222,24 @@ Language detection is deterministic and based on file extension:
 
 ## Architecture
 
+<div align="center">
+  <img src="./docs/public/mcp-execution-animation.svg" alt="Chanakya MCP End-to-End Execution Flow" width="100%" />
+</div>
+
 ```
-Project Files on Disk
+[1] AI Agent Tool Call (stdio stdin)
        ↓
-[1] File Scanner & .gitignore Cascade      (src/scanner/)
+[2] File Scanner & .gitignore Cascade      (src/scanner/)
        ↓
-[2] Native Tree-Sitter Parser             (src/parser/)
+[3] Native Tree-Sitter AST Parser          (src/parser/)
        ↓
-[3] Normalized Code Model & Extraction    (src/model/, src/extract/)
+[4] Normalized Code Model & Extraction     (src/model/, src/extract/)
        ↓
-[4] Relational SQLite Database Store       (src/store/, src/indexer/)
+[5] Relational SQLite Database Store       (src/store/, src/indexer/)
        ↓
-[5] Navigation, Graph & Search Engines    (src/navigation/, src/search/, src/graph/)
+[6] Navigation, Graph & Search Engines     (src/navigation/, src/search/, src/graph/)
        ↓
-[6] MCP Stdio Protocol & Safe Edits        (src/mcp/, src/edit/)
+[7] MCP Stdio Protocol & Safe Edits        (src/mcp/, src/edit/)
        ↓
 AI Coding Clients (Claude Code, Cursor, Windsurf, Cline)
 ```

@@ -82,13 +82,21 @@ Connect Chanakya MCP to your favorite AI coding assistant in seconds over standa
 
 ---
 
+## How It Works: Interactive Execution Animation
+
+Watch how Chanakya MCP executes from the moment an AI agent invokes an MCP tool over standard input/output (`stdio`), to AST parsing, symbol extraction, relational SQLite indexing, and sub-millisecond 360° context delivery:
+
+<McpFlowAnimation />
+
+---
+
 ## System Architecture
 
 Chanakya MCP operates as a deterministic compiler-grade pipeline: scanning files with `.gitignore` cascade support, parsing with native Tree-Sitter grammars, extracting language-agnostic code models, and querying a high-speed SQLite relational index.
 
 <div class="doc-image-card">
-  <img src="/architecture-diagram.svg" alt="Chanakya MCP Architecture Overview" />
-  <div class="doc-image-caption">Complete System Architecture: Scanner → Tree-Sitter → Model Extraction → SQLite Index → MCP Engine</div>
+  <img src="/mcp-execution-animation.svg" alt="Chanakya MCP End-to-End Execution Flow" />
+  <div class="doc-image-caption">Complete System Architecture: Tool Calling → Scanner → Tree-Sitter AST → Relational SQLite Store → 360° Context Engine</div>
 </div>
 
 ---

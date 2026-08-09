@@ -1,9 +1,9 @@
-﻿# SQLite Index & Performance
+# SQLite Index & Performance
 
 Chanakya MCP compiles the structural AST of your repository into an embedded SQLite database at `<project>/.chanakya/index.db`.
 
 <div class="custom-banner">
-  <div class="custom-banner-icon">âš¡</div>
+  <div class="custom-banner-icon">⚡</div>
   <div class="custom-banner-content">
     <h4>Sub-Millisecond Relational Storage</h4>
     <p>All tables are indexed on primary lookup paths: symbol names, file paths, parent IDs, and relational graph edge targets.</p>
@@ -33,7 +33,7 @@ The index is organized into eight optimized relational tables:
 
 On large repositories (e.g. 5,000+ files), storing raw strings for millions of identifier references causes database bloat.
 
-Codebrain implements **reference interning**:
+Chanakya MCP implements **reference interning**:
 - 2,000,000+ raw references collapse into ~55,000 distinct dictionary entries in `reference_names`.
 - Reduces index disk footprint by over **75%**, keeping memory cache hot and query times fast.
 
@@ -45,22 +45,22 @@ Reindexing never re-parses unchanged files:
 
 ```
 File Modified Event
-       â†“
+       ↓
 Stage 1: Size & Mtime Check (18ms stat scan)
-       â†“ (If mismatch)
+       ↓ (If mismatch)
 Stage 2: Content SHA-256 Hash Verification
-       â†“ (If hash changed)
+       ↓ (If hash changed)
 Cascade-delete old file rows & Reinsert in single transaction
 ```
 
 ### Racily-Clean Timestamp Protection
-Filesystems have coarse timestamp resolution (1s on ext4, 2s on FAT). If a file is edited within two seconds of being indexed with identical byte count, Codebrain does not trust the mtime aloneâ€”it evaluates the content hash to guarantee zero stale data.
+Filesystems have coarse timestamp resolution (1s on ext4, 2s on FAT). If a file is edited within two seconds of being indexed with identical byte count, Chanakya MCP does not trust the mtime alone—it evaluates the content hash to guarantee zero stale data.
 
 ---
 
 ## Performance Measurements
 
-| Metric | Codebrain Codebase (103 files) | Stress Monorepo (5,123 files) |
+| Metric | Chanakya MCP Codebase (103 files) | Stress Monorepo (5,123 files) |
 | :--- | :--- | :--- |
 | **Full Initial Index** | **1.6 seconds** | ~230 seconds |
 | **Incremental Reindex** | **18 - 24 ms** | **45 - 80 ms** |
@@ -68,4 +68,3 @@ Filesystems have coarse timestamp resolution (1s on ext4, 2s on FAT). If a file 
 | **Database Size on Disk**| **2.0 MB** | 256 MB (interned) |
 | **Extracted Symbols** | 655 symbols | 122,936 symbols |
 | **Relational Edges** | 1,840 edges | 370,534 relationships |
-
