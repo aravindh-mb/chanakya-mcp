@@ -1,6 +1,6 @@
 {
   "name": "@aravindh-arumugam/chanakya-mcp",
-  "version": "2.0.0",
+  "version": "2.0.2",
   "description": "Chanakya MCP: Local Model Context Protocol server delivering deep structural AST intelligence and 80-93% token reduction for AI coding agents.",
   "keywords": [
     "mcp",
@@ -15,6 +15,15 @@
     "cursor"
   ],
   "license": "MIT",
+  "author": "Aravindh Arumugam",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aravindh-mb/chanakya-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/aravindh-mb/chanakya-mcp/issues"
+  },
+  "homepage": "https://github.com/aravindh-mb/chanakya-mcp#readme",
   "type": "module",
   "engines": {
     "node": ">=18.18.0"

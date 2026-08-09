@@ -6,9 +6,9 @@
 ### Deterministic Structural Code Intelligence for AI Agents
 
 [![npm version](https://img.shields.io/npm/v/@aravindh-arumugam/chanakya-mcp?color=38bdf8&style=flat-square)](https://www.npmjs.com/package/@aravindh-arumugam/chanakya-mcp)
-[![License: MIT](https://img.shields.io/badge/License-MIT-10b981.svg?style=flat-square)](./LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-10b981.svg?style=flat-square)](https://github.com/aravindh-mb/chanakya-mcp/blob/master/LICENSE)
 [![Zero Network Calls](https://img.shields.io/badge/Network-Zero%20Calls%20(100%25%20Local)-10b981.svg?style=flat-square)](#privacy--security)
-[![Tests Passing](https://img.shields.io/badge/Tests-604%20Passed-38bdf8.svg?style=flat-square)](#testing)
+[![Tests Passing](https://img.shields.io/badge/Tests-604%20Passed-38bdf8.svg?style=flat-square)](#development--documentation)
 
 **A high-performance local [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server that equips AI coding agents (Claude Code, Cursor, Windsurf, Roo Code, Cline) with deep structural AST knowledge of JavaScript and TypeScript codebases.**
 
@@ -293,4 +293,4 @@ pnpm run docs:dev       # Start VitePress documentation server
 
 ## License
 
-[MIT](./LICENSE) © Aravindh Arumugam
+[MIT](https://github.com/aravindh-mb/chanakya-mcp/blob/master/LICENSE) © Aravindh Arumugam
