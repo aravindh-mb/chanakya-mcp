@@ -23,7 +23,7 @@
   "bugs": {
     "url": "https://github.com/aravindh-mb/chanakya-mcp/issues"
   },
-  "homepage": "https://github.com/aravindh-mb/chanakya-mcp#readme",
+  "homepage": "https://chanakyamcp.vercel.app",
   "type": "module",
   "engines": {
     "node": ">=18.18.0"

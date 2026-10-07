@@ -9,7 +9,7 @@
 A local MCP server that indexes JavaScript and TypeScript projects, so Claude, Cursor, Gemini and other agents can find definitions, callers and dependencies in one call instead of grepping and reading whole files.
 
 [![npm version](https://img.shields.io/npm/v/@aravindh-arumugam/chanakya-mcp?color=38bdf8&style=flat-square)](https://www.npmjs.com/package/@aravindh-arumugam/chanakya-mcp)
-[![License: MIT](https://img.shields.io/badge/license-MIT-10b981?style=flat-square)](https://github.com/aravindh-mb/chanakya-mcp/blob/master/LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-10b981?style=flat-square)](https://unpkg.com/@aravindh-arumugam/chanakya-mcp/LICENSE)
 [![100% local](https://img.shields.io/badge/runs-100%25%20local-10b981?style=flat-square)](#private-by-design)
 [![Node](https://img.shields.io/badge/node-%3E%3D18.18-38bdf8?style=flat-square)](#requirements)
 
@@ -112,7 +112,7 @@ Measured on Windows 11, Node 24, against the [VS Code](https://github.com/micros
 | Tokens vs grep + reads, 16-file app   | **56% fewer**                   |
 | Tokens vs grep + reads, 126-file repo | **90% fewer**                   |
 
-Full results, method and caveats: [`bench/benchmark-report.html`](https://github.com/aravindh-mb/chanakya-mcp/blob/master/bench/benchmark-report.html). Reproduce with `pnpm run bench:sample`.
+Numbers come from the benchmark scripts in the source repository (`pnpm run bench`, `pnpm run bench:sample`). Changes behind them are listed in the [changelog](https://unpkg.com/@aravindh-arumugam/chanakya-mcp/CHANGELOG.md).
 
 ## Options
 
@@ -138,7 +138,7 @@ Logs go to stderr; stdout carries only MCP protocol messages.
 - User regexes run in a worker thread with a time limit, so a bad pattern can't hang the server.
 - All SQL is parameterized.
 
-See [SECURITY.md](https://github.com/aravindh-mb/chanakya-mcp/blob/master/SECURITY.md) for the full threat model.
+See [SECURITY.md](https://unpkg.com/@aravindh-arumugam/chanakya-mcp/SECURITY.md) for the full threat model.
 
 ## Requirements
 
@@ -147,4 +147,4 @@ See [SECURITY.md](https://github.com/aravindh-mb/chanakya-mcp/blob/master/SECURI
 
 ## Links
 
-[Documentation](https://chanakyamcp.vercel.app) · [Changelog](https://github.com/aravindh-mb/chanakya-mcp/blob/master/CHANGELOG.md) · [Issues](https://github.com/aravindh-mb/chanakya-mcp/issues) · [MIT License](https://github.com/aravindh-mb/chanakya-mcp/blob/master/LICENSE) © Aravindh Arumugam
+[Documentation](https://chanakyamcp.vercel.app) · [Changelog](https://unpkg.com/@aravindh-arumugam/chanakya-mcp/CHANGELOG.md) · [MIT License](https://unpkg.com/@aravindh-arumugam/chanakya-mcp/LICENSE) © Aravindh Arumugam
