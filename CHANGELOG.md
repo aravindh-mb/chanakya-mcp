@@ -21,7 +21,10 @@ All notable changes are documented here. The format is based on
 - CI workflow running typecheck, lint, tests and the build on Linux, macOS and
   Windows under Node 20 and 22.
 
-## [2.1.0] - 2026-10-07
+## [2.1.1] - 2026-10-08
+
+First public release of these changes (2.1.0 was staged on npm but never
+published).
 
 Large-repository performance. On VS Code (14,432 files) the first index went
 from 21.3 to 3.6 minutes and a one-file reindex from 14.5 to 6.4 seconds, with
