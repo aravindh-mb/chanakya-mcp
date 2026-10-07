@@ -193,3 +193,67 @@ describe('resolve_project_graph: references and imports', () => {
     expect(imports[0]?.resolved_path).toBe('src/user.ts');
   });
 });
+
+describe('resolve_project_graph: large inputs', () => {
+  it('resolves thousands of uses of one import binding', () => {
+    const count = 6_000;
+    const body = Array.from({ length: count }, () => '  helper();').join('\n');
+    index([
+      ['src/user.ts', USER],
+      ['src/app.ts', `import { helper } from './user';\nfunction main() {\n${body}\n}\n`],
+    ]);
+
+    const app_symbol = store.find_symbols_by_name('main')[0];
+    const edges = calls(store.get_relationships_from(app_symbol!.id));
+    const uses = store
+      .get_references_to('src/user.ts#function:helper')
+      .filter((ref) => ref.file_path === 'src/app.ts' && !ref.is_definition);
+
+    expect(edges).toHaveLength(count);
+    expect(edges.every((edge) => edge.to_id === 'src/user.ts#function:helper')).toBe(true);
+    // The import binding itself is also a use of the name.
+    expect(uses.length).toBeGreaterThanOrEqual(count);
+  });
+
+  it('resolves across more import bindings than fit in one page', () => {
+    // The pass walks import bindings 2,000 at a time.
+    const count = 2_100;
+    const modules: Array<readonly [string, string]> = [];
+    const lines: string[] = [];
+    const calls_made: string[] = [];
+    for (let index = 0; index < count; index += 1) {
+      modules.push([`src/m${index}.ts`, `export function f${index}() {}\n`]);
+      lines.push(`import { f${index} } from './m${index}';`);
+      calls_made.push(`  f${index}();`);
+    }
+    index([
+      ...modules,
+      ['src/app.ts', `${lines.join('\n')}\nfunction main() {\n${calls_made.join('\n')}\n}\n`],
+    ]);
+
+    const app_symbol = store.find_symbols_by_name('main')[0];
+    const edges = calls(store.get_relationships_from(app_symbol!.id));
+
+    expect(edges).toHaveLength(count);
+    expect(
+      edges.every((edge) => edge.to_id === `src/m${edge.to_name.slice(1)}.ts#function:${edge.to_name}`),
+    ).toBe(true);
+    expect(
+      store.get_references_to(`src/m${count - 1}.ts#function:f${count - 1}`).map((ref) => ref.file_path),
+    ).toContain('src/app.ts');
+  });
+
+  it('leaves names that are not imported unresolved without reading them', () => {
+    index([
+      ['src/user.ts', USER],
+      ['src/app.ts', 'function main() { helper(); local(); }\nfunction local() {}\n'],
+    ]);
+
+    const app_symbol = store.find_symbols_by_name('main')[0];
+    const helper_call = calls(store.get_relationships_from(app_symbol!.id)).find(
+      (edge) => edge.to_name === 'helper',
+    );
+
+    expect(helper_call?.to_id).toBeUndefined();
+  });
+});

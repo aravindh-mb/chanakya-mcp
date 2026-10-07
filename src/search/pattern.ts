@@ -81,6 +81,12 @@ export interface line_matcher {
    * the budget ran out rather than resolving.
    */
   find_all(lines: readonly string[]): Promise<number[]>;
+  /**
+   * `false` only when no line of `source` can match, so the caller can skip the
+   * file without splitting it. Always `true` for regexes: running a user regex
+   * over a whole file on the main thread would bypass the worker's time budget.
+   */
+  may_match(source: string): boolean;
   /** Release the worker thread. Idempotent; no `find_all` calls after this. */
   dispose(): Promise<void>;
 }
@@ -129,6 +135,9 @@ function build_literal_matcher(options: build_matcher_options): line_matcher {
         columns[index] = haystack.indexOf(needle);
       }
       return columns;
+    },
+    may_match(source: string): boolean {
+      return (options.case_sensitive === true ? source : source.toLowerCase()).includes(needle);
     },
     dispose(): Promise<void> {
       return Promise.resolve();
@@ -221,6 +230,9 @@ function build_regex_matcher(options: build_matcher_options): line_matcher {
         pending.set(id, { resolve, reject });
         worker.postMessage({ id, pattern: options.query, flags, lines });
       });
+    },
+    may_match(): boolean {
+      return true;
     },
     async dispose(): Promise<void> {
       if (disposed) {

@@ -287,3 +287,36 @@ describe('search_code filters and limits', () => {
     expect(result.files_searched).toBe(2);
   });
 });
+
+describe('search_code across many files', () => {
+  it('finds matches beyond the first read window, in index order', async () => {
+    // Files are read in concurrent windows of 32; 70 files span three of them,
+    // and every other file cannot match so the whole-file pre-check is used.
+    const files: Record<string, string> = {};
+    for (let index = 0; index < 70; index += 1) {
+      const name = `src/file_${String(index).padStart(2, '0')}.ts`;
+      files[name] =
+        index % 2 === 0 ? `export const value_${index} = 'Needle';\n` : `export const other_${index} = 1;\n`;
+    }
+    const many = create_temp_project(files);
+    many.backdate_all(60_000);
+    const many_store = index_store.open({
+      data_dir_path: join(many.root_path, '.code-intelligence'),
+      project_root: many.root_path,
+      in_memory: true,
+    });
+    try {
+      await index_project({ store: many_store, root_path: many.root_path });
+      const result = await search_code(many_store, { query: 'needle', limit: 500 });
+
+      const paths = result.matches.map((match) => match.file_path);
+      expect(paths).toHaveLength(35);
+      expect(paths).toEqual([...paths].sort());
+      expect(result.files_searched).toBe(70);
+      expect(result.timed_out).toBe(false);
+    } finally {
+      many_store.close();
+      many.cleanup();
+    }
+  });
+});

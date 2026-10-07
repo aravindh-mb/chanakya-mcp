@@ -77,15 +77,23 @@ export function search_symbols(store: index_store, options: search_symbols_optio
  * case-insensitive for ASCII. Case-sensitive ones deliberately avoid `LIKE` and
  * `GLOB`: `LIKE` cannot be made case-sensitive without changing a database-wide
  * pragma, and `GLOB` has no escape clause, so a query containing `*` or `[`
- * would silently become a wildcard. `substr` and `instr` have neither problem.
+ * would silently become a wildcard. A range and `instr` have neither problem.
+ *
+ * The case-sensitive prefix is a half-open range rather than `substr(name, …)`
+ * because a range is something the name index can seek into; a function of the
+ * column is not, and forces a scan of every symbol.
  */
 function build_name_condition(mode: match_mode, query: string, case_sensitive: boolean): sql_condition {
   if (case_sensitive) {
     switch (mode) {
       case 'exact':
         return { sql: 'name = ?', parameters: [query] };
-      case 'prefix':
-        return { sql: 'substr(name, 1, ?) = ?', parameters: [String(query.length), query] };
+      case 'prefix': {
+        const upper = prefix_upper_bound(query);
+        return upper === undefined
+          ? { sql: 'name >= ? AND instr(name, ?) = 1', parameters: [query, query] }
+          : { sql: 'name >= ? AND name < ?', parameters: [query, upper] };
+      }
       case 'substring':
         return { sql: 'instr(name, ?) > 0', parameters: [query] };
     }
@@ -100,6 +108,23 @@ function build_name_condition(mode: match_mode, query: string, case_sensitive: b
     case 'substring':
       return { sql: `name LIKE ? ESCAPE '\\'`, parameters: [`%${escaped}%`] };
   }
+}
+
+/**
+ * The smallest string greater than every string starting with `prefix`, in
+ * SQLite's BINARY (UTF-8 byte, so code point) order: the prefix with its last
+ * character incremented.
+ *
+ * `undefined` when the last character is a surrogate or U+FFFF, where adding
+ * one to the code unit does not give the next code point. The caller then falls
+ * back to a bounded-below scan, which is still correct.
+ */
+function prefix_upper_bound(prefix: string): string | undefined {
+  const last = prefix.charCodeAt(prefix.length - 1);
+  if (last >= 0xd800 && (last <= 0xdfff || last === 0xffff)) {
+    return undefined;
+  }
+  return prefix.slice(0, -1) + String.fromCharCode(last + 1);
 }
 
 /**

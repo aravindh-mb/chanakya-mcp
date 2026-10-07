@@ -116,6 +116,9 @@ interface prepared_statements {
   readonly select_relationships_from: Statement;
   readonly select_relationships_to: Statement;
   readonly select_unresolved_calls: Statement;
+  readonly select_import_page_end: Statement;
+  readonly select_resolvable_calls_in_import_range: Statement;
+  readonly select_resolvable_references_in_import_range: Statement;
   readonly select_all_imports: Statement;
   readonly select_all_exports: Statement;
   readonly select_symbols_by_parent: Statement;
@@ -278,6 +281,34 @@ export class index_store {
     return rows.map(to_relationship);
   }
 
+  /**
+   * The key ending the next page of import bindings after `after_key`, or
+   * `undefined` when there are none left. Graph resolution walks the imports in
+   * these pages, so its memory stays bounded however large the repository.
+   */
+  next_import_page_end(after_key: number, page_size: number): number | undefined {
+    const row = this.#statements.select_import_page_end.get(after_key, page_size) as {
+      last_key: number | null;
+    };
+    return row.last_key ?? undefined;
+  }
+
+  /**
+   * Unresolved call edges that *can* resolve through the import bindings with
+   * keys in (`after_key`, `last_key`]: edges in the binding's own file whose
+   * name is the binding or starts with "binding.". These are the only edges
+   * the resolution pass can follow.
+   */
+  get_resolvable_call_edges(after_key: number, last_key: number): readonly relationship[] {
+    const rows = this.#statements.select_resolvable_calls_in_import_range.all(
+      after_key,
+      last_key,
+      after_key,
+      last_key,
+    ) as relationship_row[];
+    return rows.map(to_relationship);
+  }
+
   get_all_imports(): readonly code_import[] {
     const rows = this.#statements.select_all_imports.all() as import_row[];
     return rows.map(to_code_import);
@@ -340,6 +371,21 @@ export class index_store {
    */
   get_unresolved_references(): readonly code_reference[] {
     const rows = this.#statements.select_unresolved_references.all() as reference_row[];
+    return rows.map(to_code_reference);
+  }
+
+  /**
+   * Unresolved references that *can* resolve through the import bindings with
+   * keys in (`after_key`, `last_key`]: uses of a name their own file imports,
+   * other than as a namespace. On a large repository almost every unresolved
+   * reference is a local or a property access, so starting from the imports is
+   * the difference between testing millions of rows and seeking thousands.
+   */
+  get_resolvable_references(after_key: number, last_key: number): readonly code_reference[] {
+    const rows = this.#statements.select_resolvable_references_in_import_range.all(
+      after_key,
+      last_key,
+    ) as reference_row[];
     return rows.map(to_code_reference);
   }
 
@@ -466,6 +512,29 @@ export class index_store {
   /** Run `work` inside a transaction, rolling back if it throws. */
   transaction<result>(work: () => result): result {
     return this.#db.transaction(work)();
+  }
+
+  /**
+   * Drop the secondary indexes before a bulk load into an empty index.
+   *
+   * Building an index once over finished tables is far cheaper than updating
+   * it on every insert. Constraint indexes (`UNIQUE`, primary keys) are kept:
+   * writes depend on them. If the process dies before
+   * `restore_secondary_indexes`, the next `open` recreates them, because the
+   * schema is applied on every open.
+   */
+  drop_secondary_indexes(): void {
+    const names = this.#db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND sql IS NOT NULL")
+      .all() as Array<{ name: string }>;
+    for (const { name } of names) {
+      this.#db.exec(`DROP INDEX IF EXISTS "${name}"`);
+    }
+  }
+
+  /** Recreate whatever `drop_secondary_indexes` removed. Idempotent. */
+  restore_secondary_indexes(): void {
+    this.#db.exec(SCHEMA_SQL);
   }
 
   /** Reclaim space and refresh planner statistics after a large reindex. */
@@ -789,6 +858,31 @@ function prepare_statements(db: database_handle): prepared_statements {
     select_unresolved_calls: db.prepare(
       `${relationships_select} WHERE r.kind = 'calls' AND r.to_key IS NULL`,
     ),
+    select_import_page_end: db.prepare(
+      `SELECT max(key) AS last_key FROM (
+         SELECT key FROM imports WHERE key > ? AND local_name IS NOT NULL ORDER BY key LIMIT ?)`,
+    ),
+    // Driven from the imports rather than the edges: each binding seeks
+    // (file_id, to_name) for the bare name and for "binding." chains. The two
+    // seeks are a UNION because an OR of them cannot use the index. '/' is the
+    // character after '.', so the range is exactly the names starting "binding.".
+    //
+    // CROSS JOIN pins the join order and the unary `+` keeps the IS NULL tests
+    // off their indexes. Left to itself the planner starts from "every
+    // unresolved row" instead of the page of imports, which on VS Code turned a
+    // one-second pass into an eight-minute one. The same holds for references.
+    select_resolvable_calls_in_import_range: db.prepare(
+      `${relationships_select}
+       WHERE r.key IN (
+         SELECT e.key FROM imports i CROSS JOIN relationships e
+           ON e.file_id = i.file_id AND e.to_name = i.local_name
+         WHERE i.key > ? AND i.key <= ? AND +e.kind = 'calls' AND +e.to_key IS NULL
+         UNION
+         SELECT e.key FROM imports i CROSS JOIN relationships e
+           ON e.file_id = i.file_id AND e.to_name > i.local_name || '.' AND e.to_name < i.local_name || '/'
+         WHERE i.key > ? AND i.key <= ? AND +e.kind = 'calls' AND +e.to_key IS NULL)
+       ORDER BY r.key`,
+    ),
     select_all_imports: db.prepare(`${imports_select}`),
     select_all_exports: db.prepare(`${exports_select}`),
     select_symbols_by_parent: db.prepare(`${symbols_select} WHERE s.parent_id = ? ORDER BY s.start_line`),
@@ -807,6 +901,16 @@ function prepare_statements(db: database_handle): prepared_statements {
     ),
     select_unresolved_references: db.prepare(
       `${references_select} WHERE r.symbol_key IS NULL AND r.is_definition = 0`,
+    ),
+    select_resolvable_references_in_import_range: db.prepare(
+      `${references_select}
+       WHERE r.key IN (
+         SELECT u.key FROM imports i
+         CROSS JOIN reference_names n ON n.name = i.local_name
+         CROSS JOIN ${REFERENCES_TABLE} u ON u.name_key = n.key AND u.file_id = i.file_id
+         WHERE i.key > ? AND i.key <= ? AND i.kind <> 'namespace'
+           AND +u.symbol_key IS NULL AND +u.is_definition = 0)
+       ORDER BY r.key`,
     ),
     select_symbol_key: db.prepare('SELECT key FROM symbols WHERE id = ?'),
     update_edge_target: db.prepare(

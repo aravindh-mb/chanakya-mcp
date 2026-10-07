@@ -1,6 +1,6 @@
 {
   "name": "@aravindh-arumugam/chanakya-mcp",
-  "version": "2.0.2",
+  "version": "2.1.0",
   "description": "Chanakya MCP: Local Model Context Protocol server delivering deep structural AST intelligence and 80-93% token reduction for AI coding agents.",
   "keywords": [
     "mcp",

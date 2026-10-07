@@ -29,6 +29,30 @@ import type { index_store } from '../store/index_store.js';
 /** How far to chase re-export chains before giving up. */
 const MAX_RE_EXPORT_DEPTH = 8;
 
+/** Import bindings per page. Each page's candidate rows are read in one query. */
+const IMPORT_PAGE_SIZE = 2_000;
+
+/**
+ * Yield the candidate rows for every page of import bindings. Only a row that
+ * names an import binding in its own file can resolve, so the bindings drive
+ * the walk; `fetch` returns the rows for the bindings with keys in
+ * (`after_key`, `last_key`].
+ */
+function* by_import_page<row_type>(
+  store: index_store,
+  fetch: (after_key: number, last_key: number) => readonly row_type[],
+): Generator<row_type> {
+  let after = 0;
+  for (;;) {
+    const last = store.next_import_page_end(after, IMPORT_PAGE_SIZE);
+    if (last === undefined) {
+      return;
+    }
+    yield* fetch(after, last);
+    after = last;
+  }
+}
+
 export interface resolve_project_graph_options {
   readonly store: index_store;
   readonly logger?: logger;
@@ -79,7 +103,9 @@ export function resolve_project_graph(options: resolve_project_graph_options): r
       push(exports_by_file, item.file_path, item);
     }
 
-    for (const edge of store.get_unresolved_call_edges()) {
+    // Paged rather than loaded whole: on a large repository the unresolved rows
+    // number in the millions, and holding them all at once cost gigabytes.
+    for (const edge of by_import_page(store, (after, last) => store.get_resolvable_call_edges(after, last))) {
       const target = resolve_edge_target(edge, files, imports_by_file, exports_by_file, store);
       if (target !== undefined) {
         // The id is assigned by the store and always present on a read row.
@@ -88,7 +114,9 @@ export function resolve_project_graph(options: resolve_project_graph_options): r
       }
     }
 
-    for (const reference of store.get_unresolved_references()) {
+    for (const reference of by_import_page(store, (after, last) =>
+      store.get_resolvable_references(after, last),
+    )) {
       const target = resolve_reference_target(
         reference.name,
         reference.file_path,

@@ -205,3 +205,20 @@ describe('search_symbols results', () => {
     expect(hit?.symbol.parent_id).toContain('user_service');
   });
 });
+
+describe('search_symbols case-sensitive prefix range', () => {
+  it('stops at names that diverge at the last character of the prefix', () => {
+    expect(names({ query: 'create_o', match: 'prefix', case_sensitive: true })).toEqual(['create_order']);
+  });
+
+  it('excludes a name shorter than the prefix', () => {
+    const found = names({ query: 'user_', match: 'prefix', case_sensitive: true });
+    expect(found).toContain('user_service');
+    expect(found).toContain('user_id');
+    expect(found).not.toContain('user');
+  });
+
+  it('handles a prefix ending in a lone surrogate without throwing', () => {
+    expect(names({ query: 'user\uD835', match: 'prefix', case_sensitive: true })).toEqual([]);
+  });
+});

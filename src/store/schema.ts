@@ -153,6 +153,10 @@ CREATE TABLE IF NOT EXISTS exports (
 -- find_definition and find_references.
 CREATE INDEX IF NOT EXISTS idx_symbols_name       ON symbols(name);
 CREATE INDEX IF NOT EXISTS idx_symbols_name_kind  ON symbols(name, kind);
+-- Case-insensitive search is the default. A BINARY index cannot serve
+-- "name = ? COLLATE NOCASE" or "name LIKE 'q%'", so without this one every
+-- default lookup scans the whole table.
+CREATE INDEX IF NOT EXISTS idx_symbols_name_nocase ON symbols(name COLLATE NOCASE);
 CREATE INDEX IF NOT EXISTS idx_symbols_file       ON symbols(file_id);
 CREATE INDEX IF NOT EXISTS idx_symbols_parent     ON symbols(parent_id);
 CREATE INDEX IF NOT EXISTS idx_symbols_kind       ON symbols(kind);
@@ -163,9 +167,16 @@ CREATE INDEX IF NOT EXISTS idx_rel_from  ON relationships(from_key);
 CREATE INDEX IF NOT EXISTS idx_rel_to    ON relationships(to_key);
 CREATE INDEX IF NOT EXISTS idx_rel_kind  ON relationships(kind);
 CREATE INDEX IF NOT EXISTS idx_rel_name  ON relationships(to_name);
-CREATE INDEX IF NOT EXISTS idx_rel_file  ON relationships(file_id);
+-- (file_id, to_name) rather than file_id alone: it still serves per-file
+-- lookups and cascade deletes, and also lets graph resolution seek straight to
+-- the edges an import binding can name instead of testing every edge.
+DROP INDEX IF EXISTS idx_rel_file;
+CREATE INDEX IF NOT EXISTS idx_rel_file_name ON relationships(file_id, to_name);
 
-CREATE INDEX IF NOT EXISTS idx_refs_name   ON "references"(name_key);
+-- (name_key, file_id) rather than name_key alone, for the same reason: graph
+-- resolution looks up "uses of this imported name in this file".
+DROP INDEX IF EXISTS idx_refs_name;
+CREATE INDEX IF NOT EXISTS idx_refs_name_file ON "references"(name_key, file_id);
 CREATE INDEX IF NOT EXISTS idx_refs_symbol ON "references"(symbol_key);
 CREATE INDEX IF NOT EXISTS idx_refs_file   ON "references"(file_id);
 

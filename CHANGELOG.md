@@ -21,6 +21,41 @@ All notable changes are documented here. The format is based on
 - CI workflow running typecheck, lint, tests and the build on Linux, macOS and
   Windows under Node 20 and 22.
 
+## [2.1.0] - 2026-10-07
+
+Large-repository performance. On VS Code (14,432 files) the first index went
+from 21.3 to 3.6 minutes and a one-file reindex from 14.5 to 6.4 seconds, with
+identical index contents. Full numbers: `bench/benchmark-report.html`.
+
+### Added
+
+- Parallel analysis: files are parsed on a pool of up to 4 worker threads
+  (`index_project({ workers })`, `dist/indexer/analyze_worker.js`), with
+  in-process analysis as the fallback. The next batch parses while the
+  previous one is written.
+- First-index bulk load: an empty index drops its secondary indexes, loads
+  every row, and builds them once at the end.
+
+### Changed
+
+- Graph resolution starts from import bindings and reads candidate rows a page
+  at a time, instead of loading every unresolved reference into memory. On
+  VS Code (14k files) this removed multi-gigabyte memory growth and made a
+  one-file reindex faster.
+- `relationships(file_id)` and `references(name_key)` indexes widened to
+  `(file_id, to_name)` and `(name_key, file_id)`; existing databases are
+  upgraded in place on open.
+- `search_code` reads files in concurrent windows and skips files whose
+  content cannot match a literal query.
+
+### Fixed
+
+- Default (case-insensitive) symbol search scanned every symbol: added a
+  `COLLATE NOCASE` name index. Case-sensitive prefix search now uses a range
+  the index can seek instead of `substr()`.
+- `search_code` could spend its whole time budget reading files on a large
+  repository and return no matches.
+
 ## [0.1.0] - unreleased
 
 ### Added

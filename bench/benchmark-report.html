@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chanakya MCP Benchmarks</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11, 11, 11, 0.10);
+    --good-text: #006300;
+    --critical: #d03b3b;
+    --warning: #fab219;
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --series-3: #1baf7a;
+    --series-4: #eda100;
+    --tooltip-bg: #0b0b0b;
+    --tooltip-text: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --page: #0d0d0d;
+      --surface: #1a1a19;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #898781;
+      --grid: #2c2c2a;
+      --baseline: #383835;
+      --border: rgba(255, 255, 255, 0.10);
+      --good-text: #0ca30c;
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --series-3: #199e70;
+      --series-4: #c98500;
+      --tooltip-bg: #ffffff;
+      --tooltip-text: #0b0b0b;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --good-text: #0ca30c;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --tooltip-bg: #ffffff;
+    --tooltip-text: #0b0b0b;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--text-primary);
+    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 1040px; margin: 0 auto; padding: 32px 16px 64px; }
+  header h1 { font-size: 28px; line-height: 1.2; margin: 0 0 6px; }
+  header p { margin: 0; color: var(--text-secondary); }
+  .meta { font-size: 13px; color: var(--text-muted); margin-top: 8px; }
+  h2 { font-size: 20px; margin: 44px 0 6px; }
+  h3 { font-size: 15px; margin: 24px 0 8px; }
+  .lede { color: var(--text-secondary); margin: 0 0 16px; max-width: 72ch; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+
+  /* Stat tiles */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 12px; margin-top: 24px; }
+  .tile .label { font-size: 13px; color: var(--text-secondary); }
+  .tile .value { font-size: 32px; font-weight: 650; line-height: 1.15; margin: 6px 0 2px; }
+  .tile .delta { font-size: 13px; color: var(--good-text); font-weight: 600; }
+  .tile .was { font-size: 13px; color: var(--text-muted); }
+
+  /* Horizontal bar chart */
+  .chart-title { font-weight: 600; margin: 0 0 2px; }
+  .chart-sub { font-size: 13px; color: var(--text-secondary); margin: 0 0 16px; }
+  .bars { display: grid; grid-template-columns: minmax(120px, 190px) 1fr; row-gap: 10px; column-gap: 12px; align-items: center; }
+  .bar-label { font-size: 13px; color: var(--text-secondary); text-align: right; }
+  .bar-track { position: relative; height: 26px; border-left: 1px solid var(--baseline); --room: 0.78; }
+  .bar, .stack { width: calc(var(--p) * var(--room) * 1%); }
+  .bar-value { left: calc(var(--p) * var(--room) * 1%); }
+  .bar {
+    position: absolute; left: 0; top: 3px; height: 20px;
+    background: var(--series-1);
+    border-radius: 0 4px 4px 0;
+    cursor: default;
+  }
+  .bar-value {
+    position: absolute; top: 3px; height: 20px; line-height: 20px;
+    font-size: 13px; font-weight: 600; color: var(--text-primary);
+    font-variant-numeric: tabular-nums; white-space: nowrap; padding-left: 8px;
+  }
+  .stack { position: absolute; left: 0; top: 3px; height: 20px; display: flex; gap: 2px; }
+  .seg { height: 100%; cursor: default; }
+  .seg:last-child { border-radius: 0 4px 4px 0; }
+  .s1 { background: var(--series-1); }
+  .s2 { background: var(--series-2); }
+  .s3 { background: var(--series-3); }
+  .s4 { background: var(--series-4); }
+  .bar:hover, .seg:hover { filter: brightness(1.12); }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--text-secondary); margin: 0 0 14px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .axis-note { font-size: 12px; color: var(--text-muted); margin-top: 10px; }
+
+  /* Tables */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; white-space: normal; min-width: 200px; }
+  th { font-weight: 600; color: var(--text-secondary); font-size: 12.5px; }
+  td { font-variant-numeric: tabular-nums; }
+  tr.total td { font-weight: 650; border-bottom: none; border-top: 1px solid var(--baseline); }
+  .good { color: var(--good-text); font-weight: 600; }
+  .muted { color: var(--text-muted); }
+  .flag {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 12px; font-weight: 600; color: var(--critical);
+  }
+  .flag::before { content: "⚠"; }
+  details { margin-top: 14px; }
+  summary { cursor: pointer; color: var(--text-secondary); font-size: 13px; }
+
+  /* Notes */
+  ul.notes { margin: 0; padding-left: 20px; }
+  ul.notes li { margin: 6px 0; }
+  code { font: 12.5px ui-monospace, "Cascadia Code", Consolas, monospace; background: var(--grid); padding: 1px 5px; border-radius: 4px; }
+
+  /* Tooltip */
+  #tooltip {
+    position: fixed; pointer-events: none; z-index: 10;
+    background: var(--tooltip-bg); color: var(--tooltip-text);
+    font-size: 12.5px; line-height: 1.4; padding: 6px 9px; border-radius: 6px;
+    opacity: 0; transition: opacity 80ms; max-width: 260px;
+  }
+  #tooltip strong { font-weight: 650; }
+
+  @media (max-width: 560px) {
+    .bars { grid-template-columns: 1fr; row-gap: 4px; }
+    .bar-label { text-align: left; }
+    .bar-track { --room: 0.5; }
+    .bar-value { font-size: 12px; }
+    .tile .value { font-size: 28px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Chanakya MCP: benchmark results</h1>
+    <p>Indexing speed, query speed and token savings, before and after the performance fixes.</p>
+    <div class="meta">Measured 7 October 2026 · Windows 11, 16 cores, Node 24.11.1 · VS Code repository (shallow clone), 14,432 indexed files</div>
+  </header>
+
+  <section class="tiles" aria-label="Headline results">
+    <div class="card tile">
+      <div class="label">First index of VS Code</div>
+      <div class="value">3.6 min</div>
+      <div class="delta">5.9× faster</div>
+      <div class="was">was 21.3 min</div>
+    </div>
+    <div class="card tile">
+      <div class="label">Re-index after a 1-file change</div>
+      <div class="value">6.4 s</div>
+      <div class="delta">2.3× faster</div>
+      <div class="was">was 14.5 s</div>
+    </div>
+    <div class="card tile">
+      <div class="label">Default symbol search</div>
+      <div class="value">0.06 ms</div>
+      <div class="delta">~2,300× faster</div>
+      <div class="was">was 139 ms (scanned every symbol)</div>
+    </div>
+    <div class="card tile">
+      <div class="label">Text search on VS Code</div>
+      <div class="value">0.3 s</div>
+      <div class="delta">50 results</div>
+      <div class="was">was 5 s timeout with 0 results</div>
+    </div>
+  </section>
+
+  <h2>First index on a large project</h2>
+  <p class="lede">Time to build the index from scratch on VS Code. "Intermediate" is after the first four fixes; "Final" adds the graph-query rewrite and the bulk-load index build.</p>
+
+  <div class="card">
+    <p class="chart-title">Total first-index time</p>
+    <p class="chart-sub">Seconds, VS Code, 14,432 files. Shorter is better.</p>
+    <div class="bars" id="total-chart"></div>
+    <div class="axis-note">Bars share one scale starting at 0 s.</div>
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <p class="chart-title">Where the time goes</p>
+    <p class="chart-sub">Seconds per indexing phase. The original run did not record a phase breakdown.</p>
+    <div class="legend" aria-hidden="true">
+      <span><i class="swatch s1"></i>Parsing</span>
+      <span><i class="swatch s2"></i>Database writes</span>
+      <span><i class="swatch s3"></i>Graph linking</span>
+      <span><i class="swatch s4"></i>File scan</span>
+    </div>
+    <div class="bars" id="phase-chart"></div>
+    <details>
+      <summary>Show as table</summary>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Run</th><th>Parsing</th><th>Database writes</th><th>Graph linking</th><th>File scan</th><th>Total</th></tr></thead>
+          <tbody>
+            <tr><td>Intermediate</td><td>101.4 s</td><td>190.3 s</td><td>58.0 s</td><td>2.1 s</td><td>352.3 s</td></tr>
+            <tr><td>Final</td><td>132.8 s</td><td>64.1 s</td><td>16.1 s</td><td>2.3 s</td><td>215.9 s</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
+    <div class="axis-note">Parsing is measured as time the main thread waits for the workers, so it rises when writes stop hiding it.</div>
+  </div>
+
+  <h2>Large project: before and after</h2>
+  <div class="card table-wrap">
+    <table>
+      <thead><tr><th>Measure (VS Code)</th><th>Original</th><th>Final</th><th>Change</th></tr></thead>
+      <tbody>
+        <tr><td>First index</td><td>1,275.9 s</td><td>215.9 s</td><td class="good">5.9× faster</td></tr>
+        <tr><td>Re-index, nothing changed</td><td>2.7 s</td><td>2.1 s</td><td class="good">1.3× faster</td></tr>
+        <tr><td>Re-index, 1 file changed</td><td>14.5 s</td><td>6.4 s</td><td class="good">2.3× faster</td></tr>
+        <tr><td>Exact symbol search, case-insensitive (default)</td><td>139 ms</td><td>0.06 ms</td><td class="good">uses index</td></tr>
+        <tr><td>Prefix symbol search</td><td>136 ms</td><td>0.13 ms</td><td class="good">uses index</td></tr>
+        <tr><td>Text search (<code>search_code</code>)</td><td>5,001 ms, 0 results</td><td>309 ms, 50 results</td><td class="good">now returns results</td></tr>
+        <tr><td>Database size</td><td>782 MB</td><td>797 MB</td><td class="muted">+2%</td></tr>
+        <tr><td>Peak memory</td><td>2.9–4.9 GB</td><td>2.9 GB</td><td class="muted">4 workers + index build</td></tr>
+        <tr><td>Indexed content</td><td colspan="2">226,624 symbols · 5,803,323 references (identical in both runs)</td><td class="muted">same results</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Per-question results on VS Code (final build)</h3>
+  <p class="lede">MCP time is one tool call. The grep baseline is ripgrep over <code>src/</code> plus reading up to 5 of the files it hits, an upper bound on what an agent would load.</p>
+  <div class="card table-wrap">
+    <table>
+      <thead><tr><th>Question</th><th>MCP before</th><th>MCP now</th><th>ripgrep</th><th>MCP tokens</th><th>Grep + reads tokens</th><th>Saved</th></tr></thead>
+      <tbody id="question-rows"></tbody>
+    </table>
+  </div>
+
+  <h2>Token savings on smaller projects</h2>
+  <p class="lede">Tokens the model has to read to answer each question (bytes ÷ 4). "Grep + reads" counts ripgrep output plus every file it points at.</p>
+
+  <h3>Sample monorepo (16 files)</h3>
+  <div class="card table-wrap">
+    <table>
+      <thead><tr><th>Question</th><th>MCP tokens</th><th>Grep + reads</th><th>Saved</th></tr></thead>
+      <tbody id="sample-rows"></tbody>
+    </table>
+  </div>
+
+  <h3>This repository (126 files)</h3>
+  <div class="card table-wrap">
+    <table>
+      <thead><tr><th>Question</th><th>MCP tokens</th><th>Grep + reads</th><th>Saved</th></tr></thead>
+      <tbody id="repo-rows"></tbody>
+    </table>
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <p class="chart-title">Tokens saved versus grep + file reads</p>
+    <p class="chart-sub">Percent of tokens saved across all benchmark questions. Higher is better.</p>
+    <div class="bars" id="savings-chart"></div>
+  </div>
+
+  <h2>Caveats and known issues</h2>
+  <div class="card">
+    <ul class="notes">
+      <li><span class="flag">Wrong answer</span> On the sample monorepo, <code>get_callers</code> misses <code>service.create_user()</code> and <code>get_dependents</code> misses the 8 files importing <code>@sample/shared</code>. Those two rows look cheap partly because the answers are incomplete. Not fixed yet.</li>
+      <li>The grep baseline on VS Code is unrealistically expensive (a plain grep for <code>createDecorator</code> returns ~400k tokens). Claude Code caps grep output, so a realistic agent lookup there is closer to ~8,000 tokens, which puts the realistic saving at about 75–99% per lookup, not 98.5%.</li>
+      <li>File structure answers are the weakest case: <code>get_file_structure</code> on <code>textModel.ts</code> returned 19,228 tokens versus 27,942 for reading the file (31% saved).</li>
+      <li>Peak memory on VS Code is still about 2.9 GB (4 parser workers plus building the indexes at the end). Normal projects measured about 1–1.5 GB.</li>
+      <li>Not measured: a real Claude or Gemini session end to end. Gemini CLI was not installed on the test machine.</li>
+    </ul>
+  </div>
+
+  <h2>What changed</h2>
+  <div class="card">
+    <ul class="notes">
+      <li><strong>Search index:</strong> a <code>COLLATE NOCASE</code> name index for the default case-insensitive search; case-sensitive prefix search now uses a range the index can seek.</li>
+      <li><strong>Text search:</strong> reads 32 files at a time and skips files whose content cannot contain the query.</li>
+      <li><strong>Graph linking:</strong> starts from import bindings and reads a page at a time instead of loading every unresolved reference into memory; the join order is pinned so SQLite does not pick a slow plan.</li>
+      <li><strong>Parallel parsing:</strong> up to 4 worker threads, with the next batch parsing while the previous one is written; identical results to single-threaded mode.</li>
+      <li><strong>Bulk first index:</strong> an empty database builds its secondary indexes once at the end instead of on every row.</li>
+    </ul>
+    <p class="axis-note">Reproduce: <code>pnpm run bench:sample</code> (sample monorepo) and <code>pnpm run bench</code> (this repository). The VS Code numbers came from a one-off script run against a shallow clone.</p>
+  </div>
+</main>
+
+<div id="tooltip" role="tooltip"></div>
+
+<script>
+  const fmt = (n, digits = 0) => n.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+
+  // ---- Data (all measured on the machine above)
+  const totals = [
+    { label: 'Original', seconds: 1275.9 },
+    { label: 'Intermediate', seconds: 352.3 },
+    { label: 'Final', seconds: 215.9 },
+  ];
+  const phases = [
+    { label: 'Intermediate', total: 352.3, parts: [101.4, 190.3, 58.0, 2.1] },
+    { label: 'Final', total: 215.9, parts: [132.8, 64.1, 16.1, 2.3] },
+  ];
+  const phase_names = ['Parsing', 'Database writes', 'Graph linking', 'File scan'];
+
+  const questions = [
+    ['Where is createDecorator defined', 3868.6, 12, 434, 290, 416822],
+    ['Where is TextModel defined', 232.8, 0.9, 284, 93, 366414],
+    ['Who calls isFalsyOrWhitespace', 2.5, 1.2, 266, 1309, 742044],
+    ['Every use of isFalsyOrWhitespace', 19.2, 2.9, 261, 8808, 399764],
+    ['Who calls createDecorator', 0.9, 0.7, 268, 1824, 16612],
+    ['Every use of URI (very popular)', 55.3, 14.5, 287, 16191, 2168876],
+    ['Imports of textModel.ts', 2.1, 1.3, null, 2570, 27942],
+    ['What breaks if strings.ts changes', 774, 158.4, 276, 16634, 403603],
+    ['Structure of textModel.ts', 2.3, 2.3, null, 19228, 27942],
+    ['Full context of TextModel', 212.6, 124, 251, 5984, 374121],
+    ['Text search: onDidChangeContent', 5001.5, 308.5, 262, 4088, 106376, 'before: timed out, 0 results'],
+  ];
+  const sample = [
+    ['Where is create_user defined', 119, 680],
+    ['Everything that uses format_money', 417, 569],
+    ['Who calls user_service.create_user', 22, 680, 'incomplete answer'],
+    ['What does the user service depend on', 171, 298],
+    ['What breaks if the shared types change', 92, 1568, 'incomplete answer'],
+    ['Structure of the user service', 517, 298],
+    ['Components using use_orders', 410, 389],
+    ['Full working context for user_service', 689, 1006],
+  ];
+  const repo = [
+    ['Where is apply_patch defined', 114, 10665],
+    ['Every use of resolve_project_path', 871, 5757],
+    ['Who calls scan_project', 617, 11748],
+    ['What does project_file.ts import', 271, 1248],
+    ['Structure of src/mcp/server.ts', 1241, 1755],
+    ['Every occurrence of handle_line', 656, 4322],
+    ['Full context of mcp_server', 713, 7958],
+  ];
+
+  // ---- Tooltip
+  const tip = document.getElementById('tooltip');
+  function attach_tip(el, html) {
+    el.addEventListener('mouseenter', () => { tip.innerHTML = html; tip.style.opacity = '1'; });
+    el.addEventListener('mousemove', (e) => {
+      const pad = 14;
+      const x = Math.min(e.clientX + pad, window.innerWidth - tip.offsetWidth - 8);
+      const y = Math.min(e.clientY + pad, window.innerHeight - tip.offsetHeight - 8);
+      tip.style.left = x + 'px';
+      tip.style.top = y + 'px';
+    });
+    el.addEventListener('mouseleave', () => { tip.style.opacity = '0'; });
+  }
+
+  function label_cell(text) {
+    const d = document.createElement('div');
+    d.className = 'bar-label';
+    d.textContent = text;
+    return d;
+  }
+
+  (function render_totals() {
+    const root = document.getElementById('total-chart');
+    const max = Math.max(...totals.map((t) => t.seconds));
+    for (const t of totals) {
+      const pct = (t.seconds / max) * 100;
+      const track = document.createElement('div');
+      track.className = 'bar-track';
+      const bar = document.createElement('div');
+      bar.className = 'bar';
+      bar.style.setProperty('--p', pct);
+      const value = document.createElement('div');
+      value.className = 'bar-value';
+      value.style.setProperty('--p', pct);
+      value.textContent = `${fmt(t.seconds, 1)} s (${fmt(t.seconds / 60, 1)} min)`;
+      attach_tip(bar, `<strong>${t.label}</strong><br>${fmt(t.seconds, 1)} s · ${fmt(t.seconds / 60, 1)} min`);
+      track.append(bar, value);
+      root.append(label_cell(t.label), track);
+    }
+  })();
+
+  (function render_phases() {
+    const root = document.getElementById('phase-chart');
+    const max = Math.max(...phases.map((p) => p.total));
+    for (const p of phases) {
+      const total = p.total;
+      const pct = (total / max) * 100;
+      const track = document.createElement('div');
+      track.className = 'bar-track';
+      const stack = document.createElement('div');
+      stack.className = 'stack';
+      stack.style.setProperty('--p', pct);
+      p.parts.forEach((v, i) => {
+        const seg = document.createElement('div');
+        seg.className = `seg s${i + 1}`;
+        seg.style.flex = `${v} 1 0`;
+        seg.style.minWidth = '2px';
+        attach_tip(seg, `<strong>${p.label} · ${phase_names[i]}</strong><br>${fmt(v, 1)} s (${fmt((v / total) * 100, 0)}% of run)`);
+        stack.append(seg);
+      });
+      const value = document.createElement('div');
+      value.className = 'bar-value';
+      value.style.setProperty('--p', pct);
+      value.textContent = `${fmt(total, 1)} s`;
+      track.append(stack, value);
+      root.append(label_cell(p.label), track);
+    }
+  })();
+
+  (function render_savings() {
+    const sum = (rows, i) => rows.reduce((a, r) => a + r[i], 0);
+    const data = [
+      { label: 'Sample app (16 files)', pct: (1 - sum(sample, 1) / sum(sample, 2)) * 100, detail: `${fmt(sum(sample, 2))} → ${fmt(sum(sample, 1))} tokens` },
+      { label: 'This repo (126 files)', pct: (1 - sum(repo, 1) / sum(repo, 2)) * 100, detail: `${fmt(sum(repo, 2))} → ${fmt(sum(repo, 1))} tokens` },
+      { label: 'VS Code (14,432 files)', pct: (1 - sum(questions, 4) / sum(questions, 5)) * 100, detail: `${fmt(sum(questions, 5))} → ${fmt(sum(questions, 4))} tokens (baseline inflated, see caveats)` },
+    ];
+    const root = document.getElementById('savings-chart');
+    for (const d of data) {
+      const pct = d.pct;
+      const track = document.createElement('div');
+      track.className = 'bar-track';
+      const bar = document.createElement('div');
+      bar.className = 'bar';
+      bar.style.setProperty('--p', pct);
+      const value = document.createElement('div');
+      value.className = 'bar-value';
+      value.style.setProperty('--p', pct);
+      value.textContent = `${fmt(d.pct, 1)}%`;
+      attach_tip(bar, `<strong>${d.label}</strong><br>${fmt(d.pct, 1)}% saved<br>${d.detail}`);
+      track.append(bar, value);
+      root.append(label_cell(d.label), track);
+    }
+  })();
+
+  // ---- Tables
+  function cell(text, cls) {
+    const td = document.createElement('td');
+    td.textContent = text;
+    if (cls) td.className = cls;
+    return td;
+  }
+  function saved_cell(mcp, grep) {
+    const pct = ((grep - mcp) / grep) * 100;
+    return cell(`${fmt(pct, 1)}%`, pct >= 0 ? 'good' : '');
+  }
+  function name_cell(name, flag) {
+    const td = document.createElement('td');
+    td.textContent = name + ' ';
+    if (flag) {
+      const f = document.createElement('span');
+      f.className = 'flag';
+      f.textContent = flag;
+      td.append(f);
+    }
+    return td;
+  }
+  function total_row(tbody, cells) {
+    const tr = document.createElement('tr');
+    tr.className = 'total';
+    cells.forEach((c) => tr.append(c));
+    tbody.append(tr);
+  }
+
+  (function render_questions() {
+    const tbody = document.getElementById('question-rows');
+    for (const [q, before, now, rg, mcp_tok, grep_tok, flag] of questions) {
+      const tr = document.createElement('tr');
+      tr.append(
+        name_cell(q, flag),
+        cell(`${fmt(before, before < 10 ? 1 : 0)} ms`),
+        cell(`${fmt(now, now < 10 ? 1 : 0)} ms`),
+        cell(rg === null ? 'file read' : `${fmt(rg)} ms`, rg === null ? 'muted' : ''),
+        cell(fmt(mcp_tok)),
+        cell(fmt(grep_tok)),
+        saved_cell(mcp_tok, grep_tok),
+      );
+      tbody.append(tr);
+    }
+    const sum = (i) => questions.reduce((a, r) => a + r[i], 0);
+    total_row(tbody, [cell('Total'), cell(''), cell(''), cell(''), cell(fmt(sum(4))), cell(fmt(sum(5))), saved_cell(sum(4), sum(5))]);
+  })();
+
+  function render_small(id, rows) {
+    const tbody = document.getElementById(id);
+    for (const [q, mcp, grep, flag] of rows) {
+      const tr = document.createElement('tr');
+      tr.append(name_cell(q, flag), cell(fmt(mcp)), cell(fmt(grep)), saved_cell(mcp, grep));
+      tbody.append(tr);
+    }
+    const mcp = rows.reduce((a, r) => a + r[1], 0);
+    const grep = rows.reduce((a, r) => a + r[2], 0);
+    total_row(tbody, [cell('Total'), cell(fmt(mcp)), cell(fmt(grep)), saved_cell(mcp, grep)]);
+  }
+  render_small('sample-rows', sample);
+  render_small('repo-rows', repo);
+</script>
+</body>
+</html>

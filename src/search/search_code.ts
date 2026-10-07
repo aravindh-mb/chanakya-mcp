@@ -37,6 +37,9 @@ const MAX_MATCH_TEXT_LENGTH = 300;
 
 export const DEFAULT_TIME_BUDGET_MS = 5_000;
 
+/** Files read at once. Enough to keep the disk busy, few enough to bound memory. */
+const READ_CONCURRENCY = 32;
+
 export async function search_code(
   store: index_store,
   options: search_code_options,
@@ -63,50 +66,69 @@ export async function search_code(
   let truncated = false;
 
   try {
-    for (const file of files) {
-      if (matches.length >= limit) {
-        truncated = true;
-        break;
-      }
-      // Checked between files rather than between lines: a per-line check would
-      // cost more than the matching itself. A batch that overruns is stopped by
-      // the deadline below, which terminates the worker.
-      if (Date.now() > deadline) {
-        timed_out = true;
-        break;
-      }
+    search: for (let offset = 0; offset < files.length; offset += READ_CONCURRENCY) {
+      // Reads are issued a window at a time: one at a time leaves the disk idle
+      // between files, which on a large repository spent the whole budget on
+      // I/O latency before reaching the files that matched. Results are still
+      // consumed in index order, so output order does not depend on timing.
+      const window = files.slice(offset, offset + READ_CONCURRENCY);
+      const sources = await Promise.all(
+        window.map((file) =>
+          readFile(file.absolute_path, 'utf8').catch(
+            // The file was deleted or became unreadable since indexing. Skipping
+            // is correct; the next index run will drop it.
+            () => undefined,
+          ),
+        ),
+      );
 
-      let source: string;
-      try {
-        source = await readFile(file.absolute_path, 'utf8');
-      } catch {
-        // The file was deleted or became unreadable since indexing. Skipping is
-        // correct; the next index run will drop it.
-        continue;
-      }
+      for (let index = 0; index < window.length; index += 1) {
+        const file = window[index]!;
+        const source = sources[index];
+        if (matches.length >= limit) {
+          truncated = true;
+          break search;
+        }
+        // Checked between files rather than between lines: a per-line check
+        // would cost more than the matching itself. A batch that overruns is
+        // stopped by the deadline below, which terminates the worker.
+        if (Date.now() > deadline) {
+          timed_out = true;
+          break search;
+        }
+        if (source === undefined) {
+          continue;
+        }
 
-      files_searched += 1;
-      const lines = source.split('\n');
-      const columns = await match_batch_with_deadline(matcher, lines, deadline);
-      if (columns === undefined) {
-        timed_out = true;
-        break;
-      }
+        files_searched += 1;
+        // Most files cannot match at all; ruling that out on the whole source
+        // skips splitting and scanning their lines.
+        if (!matcher.may_match(source)) {
+          continue;
+        }
 
-      const found = found_from_columns(columns, lines, per_file, limit - matches.length, context_lines);
-      if (found.length === 0) {
-        continue;
-      }
+        const lines = source.split('\n');
+        const columns = await match_batch_with_deadline(matcher, lines, deadline);
+        if (columns === undefined) {
+          timed_out = true;
+          break search;
+        }
 
-      // Loaded once per file with matches, not once per match.
-      const symbols = store.get_symbols_in_file(file.file_path);
-      for (const item of found) {
-        const enclosing = find_enclosing_symbol(symbols, item.line);
-        matches.push({
-          file_path: file.file_path,
-          ...item,
-          ...(enclosing === undefined ? {} : { enclosing }),
-        });
+        const found = found_from_columns(columns, lines, per_file, limit - matches.length, context_lines);
+        if (found.length === 0) {
+          continue;
+        }
+
+        // Loaded once per file with matches, not once per match.
+        const symbols = store.get_symbols_in_file(file.file_path);
+        for (const item of found) {
+          const enclosing = find_enclosing_symbol(symbols, item.line);
+          matches.push({
+            file_path: file.file_path,
+            ...item,
+            ...(enclosing === undefined ? {} : { enclosing }),
+          });
+        }
       }
     }
   } finally {

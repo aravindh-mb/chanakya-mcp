@@ -260,3 +260,85 @@ describe('index_project resilience', () => {
     expect(store.get_file('vendor/lib.ts')).toBeUndefined();
   });
 });
+
+describe('index_project first-index bulk load', () => {
+  it('matches a row-by-row index and leaves every index in place', async () => {
+    // 600 files crosses the bulk-load threshold, so a first index drops the
+    // secondary indexes and rebuilds them at the end. `force` on an empty
+    // database takes the row-by-row path instead, for comparison.
+    const files: Record<string, string> = {
+      'src/shared.ts': 'export function helper() {}\n',
+    };
+    for (let index = 0; index < 600; index += 1) {
+      files[`src/m${index}.ts`] =
+        `import { helper } from './shared';\nexport function f${index}() { helper(); }\n`;
+    }
+    project = create_temp_project(files);
+    project.backdate_all(60_000);
+
+    const snapshot = async (force: boolean): Promise<unknown> => {
+      const target = index_store.open({
+        data_dir_path: join(project!.root_path, force ? '.row-by-row' : '.bulk'),
+        project_root: project!.root_path,
+        in_memory: true,
+      });
+      try {
+        await index_project({ store: target, root_path: project!.root_path, force });
+        return {
+          counts: target.count(),
+          callers: target
+            .get_relationships_to('src/shared.ts#function:helper')
+            .filter((edge) => edge.kind === 'calls')
+            .map((edge) => edge.from_id)
+            .sort(),
+          symbol_hits: target.find_symbols_by_name('f599').map((symbol) => symbol.id),
+        };
+      } finally {
+        target.close();
+      }
+    };
+
+    const bulk = await snapshot(false);
+    const row_by_row = await snapshot(true);
+
+    expect(bulk).toEqual(row_by_row);
+    expect((bulk as { callers: string[] }).callers).toHaveLength(600);
+  });
+
+  it('restores the secondary indexes after a bulk load', async () => {
+    const files: Record<string, string> = {};
+    for (let index = 0; index < 520; index += 1) {
+      files[`src/m${index}.ts`] = `export const v${index} = ${index};\n`;
+    }
+    project = create_temp_project(files);
+    project.backdate_all(60_000);
+    store = open_store(project);
+    await index_project({ store, root_path: project.root_path });
+    store.close();
+    store = undefined;
+
+    const Database = (await import('better-sqlite3')).default;
+    const db = new Database(join(project.root_path, '.code-intelligence', DATABASE_FILE_NAME), {
+      readonly: true,
+    });
+    try {
+      const names = (
+        db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND sql IS NOT NULL").all() as Array<{
+          name: string;
+        }>
+      ).map((row) => row.name);
+      expect(names).toEqual(
+        expect.arrayContaining([
+          'idx_symbols_name',
+          'idx_symbols_name_nocase',
+          'idx_rel_file_name',
+          'idx_refs_name_file',
+          'idx_refs_file',
+          'idx_imports_file',
+        ]),
+      );
+    } finally {
+      db.close();
+    }
+  });
+});

@@ -6,33 +6,39 @@
  * run execute the same logic. Two code paths would mean two sets of bugs, and
  * the rarely-taken one would be the broken one.
  *
- * Files are processed one at a time and each result is discarded as soon as it
- * is written, so memory stays flat regardless of repository size. Writes are
+ * Files are processed a batch at a time and each result is discarded as soon as
+ * it is written, so memory stays flat regardless of repository size. Writes are
  * grouped into batched transactions because SQLite fsyncs on every commit.
+ * Within a batch, files are analysed in parallel on a worker pool when one is
+ * available (see `analyze_pool.ts`); results are still written in scan order.
  *
  * A file that fails to parse is recorded and skipped, never fatal. One
  * unreadable file in a 10,000 file repository must not cost the other 9,999.
  */
 
-import { extract_file } from '../extract/extract_file.js';
-import { build_file_index, type file_index } from '../extract/module_resolution.js';
+import { build_file_index } from '../extract/module_resolution.js';
 import { describe_unknown_error } from '../core/errors.js';
-import { hash_content } from '../core/hash.js';
 import type { logger } from '../core/logger.js';
-import type { code_file, file_analysis } from '../model/file.js';
-import { parse_file } from '../parser/parse_file.js';
+import type { file_analysis } from '../model/file.js';
 import { scan_project } from '../scanner/file_scanner.js';
 import type { scan_options, scanned_file } from '../scanner/types.js';
 import { METADATA_KEYS } from '../store/schema.js';
 import type { index_store } from '../store/index_store.js';
-import { detect_changes, normalize_modified_time } from './change_detection.js';
+import { analyze_file } from './analyze_file.js';
+import { create_analyze_pool, default_pool_size, MIN_FILES_FOR_POOL } from './analyze_pool.js';
+import { detect_changes } from './change_detection.js';
 import { resolve_project_graph } from './resolve_project_graph.js';
+
+export { analyze_file } from './analyze_file.js';
 
 /**
  * Files written per transaction. Large enough to amortize commits, small enough
  * that a crash loses little and memory stays bounded.
  */
 export const DEFAULT_WRITE_BATCH_SIZE = 200;
+
+/** Below this many files a first index keeps its indexes; rebuilding them would cost more. */
+const BULK_LOAD_MIN_FILES = 500;
 
 export interface index_project_options {
   readonly store: index_store;
@@ -46,6 +52,11 @@ export interface index_project_options {
   readonly force?: boolean;
   /** Passed through to the scanner. */
   readonly scan?: Omit<scan_options, 'root_path'>;
+  /**
+   * Worker threads for parsing. Defaults to one fewer than the CPU count
+   * (at most 4); 0 or 1 analyses in-process. Small runs never start a pool.
+   */
+  readonly workers?: number;
 }
 
 export interface index_failure {
@@ -139,19 +150,60 @@ export async function index_project(options: index_project_options): Promise<ind
     ...changes.candidates.map((file) => ({ file, is_new: false })),
   ];
 
-  for (let offset = 0; offset < work.length; offset += batch_size) {
-    const batch = work.slice(offset, offset + batch_size);
-    const analyze_started_at = Date.now();
-    const writes = await analyze_batch(batch, stored, stats, failures, log, files);
-    timings.analyze_ms += Date.now() - analyze_started_at;
+  const pool =
+    work.length >= MIN_FILES_FOR_POOL
+      ? create_analyze_pool({ files, size: options.workers ?? default_pool_size() })
+      : undefined;
 
-    const write_started_at = Date.now();
-    store.transaction(() => {
-      for (const analysis of writes) {
-        store.write_file_analysis(analysis);
-      }
-    });
-    timings.write_ms += Date.now() - write_started_at;
+  // A first index into an empty database loads every row at once, so the
+  // secondary indexes are built once at the end instead of updated per row.
+  // Not under `force`: there the old rows are still present, and each file's
+  // cascade delete needs the indexes.
+  const bulk_load = options.force !== true && stored.size === 0 && work.length >= BULK_LOAD_MIN_FILES;
+  if (bulk_load) {
+    store.drop_secondary_indexes();
+  }
+  const start_batch = (offset: number): started_batch => {
+    const batch = work.slice(offset, offset + batch_size);
+    return {
+      batch,
+      // Without a pool, one file at a time: starting them all would only hold
+      // every source in memory at once, with no parallelism to show for it.
+      results:
+        pool === undefined
+          ? settle_in_sequence(batch, (item) => analyze_file(item.file, files))
+          : Promise.allSettled(batch.map((item) => pool.analyze(item.file))),
+    };
+  };
+
+  try {
+    let next: started_batch | undefined = work.length > 0 ? start_batch(0) : undefined;
+    for (let offset = 0; next !== undefined; offset += batch_size) {
+      const analyze_started_at = Date.now();
+      const { batch, results } = next;
+      const settled = await results;
+      timings.analyze_ms += Date.now() - analyze_started_at;
+
+      // Started before this batch is written, so the pool keeps parsing while
+      // the main thread is busy in the write transaction.
+      next = offset + batch_size < work.length ? start_batch(offset + batch_size) : undefined;
+
+      const writes = collect_batch(batch, settled, stored, stats, failures, log);
+      const write_started_at = Date.now();
+      store.transaction(() => {
+        for (const analysis of writes) {
+          store.write_file_analysis(analysis);
+        }
+      });
+      timings.write_ms += Date.now() - write_started_at;
+    }
+  } finally {
+    await pool?.close();
+    if (bulk_load) {
+      const index_started_at = Date.now();
+      store.restore_secondary_indexes();
+      timings.write_ms += Date.now() - index_started_at;
+    }
   }
 
   store.set_metadata(METADATA_KEYS.indexed_at, String(Date.now()));
@@ -192,19 +244,46 @@ interface mutable_stats {
   files_parsed: number;
 }
 
-async function analyze_batch(
+interface started_batch {
+  readonly batch: readonly work_item[];
+  readonly results: Promise<PromiseSettledResult<file_analysis>[]>;
+}
+
+/** `Promise.allSettled`, but starting each call only after the previous one settles. */
+async function settle_in_sequence<item_type, value_type>(
+  items: readonly item_type[],
+  run: (item: item_type) => Promise<value_type>,
+): Promise<PromiseSettledResult<value_type>[]> {
+  const settled: PromiseSettledResult<value_type>[] = [];
+  for (const item of items) {
+    try {
+      settled.push({ status: 'fulfilled', value: await run(item) });
+    } catch (reason: unknown) {
+      settled.push({ status: 'rejected', reason });
+    }
+  }
+  return settled;
+}
+
+/** Tally one batch's analyses and pick out the ones that need writing. */
+function collect_batch(
   batch: readonly work_item[],
+  settled: readonly PromiseSettledResult<file_analysis>[],
   stored: ReadonlyMap<string, { content_hash: string }>,
   stats: mutable_stats,
   failures: index_failure[],
   log: logger | undefined,
-  files: file_index,
-): Promise<file_analysis[]> {
+): file_analysis[] {
   const writes: file_analysis[] = [];
 
-  for (const item of batch) {
+  for (let index = 0; index < batch.length; index += 1) {
+    const item = batch[index]!;
     try {
-      const analysis = await analyze_file(item.file, files);
+      const result = settled[index]!;
+      if (result.status === 'rejected') {
+        throw result.reason;
+      }
+      const analysis = result.value;
       stats.files_parsed += 1;
 
       // Second-stage check: the fingerprint said "maybe", the hash decides. A
@@ -234,41 +313,4 @@ async function analyze_batch(
   }
 
   return writes;
-}
-
-/**
- * Parse and extract one file into the shape the store writes.
- *
- * `files` is the set of indexable files the scan found; it lets the import
- * extractor resolve relative specifiers immediately. The graph resolution pass
- * later catches anything it could not.
- */
-export async function analyze_file(file: scanned_file, files?: file_index): Promise<file_analysis> {
-  const parsed = await parse_file({ file_path: file.file_path });
-  const extracted =
-    files === undefined
-      ? extract_file({ parsed, relative_path: file.relative_path })
-      : extract_file({ parsed, relative_path: file.relative_path, files });
-
-  const record: code_file = {
-    file_path: file.relative_path,
-    absolute_path: file.file_path,
-    language: file.language,
-    size: file.size,
-    // Stored as a whole number so it compares equal to the value read back out.
-    modified_time: normalize_modified_time(file.modified_time),
-    // Hashed from the source that was actually parsed, so the stored hash
-    // always corresponds to the stored symbols.
-    content_hash: hash_content(parsed.source),
-    parse_error_count: parsed.parse_errors.length,
-  };
-
-  return {
-    file: record,
-    symbols: extracted.symbols,
-    relationships: extracted.relationships,
-    imports: extracted.imports,
-    exports: extracted.exports,
-    references: extracted.references,
-  };
 }
