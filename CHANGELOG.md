@@ -21,6 +21,25 @@ All notable changes are documented here. The format is based on
 - CI workflow running typecheck, lint, tests and the build on Linux, macOS and
   Windows under Node 20 and 22.
 
+## [2.1.3] - 2026-10-28
+
+Includes everything in 2.1.2, which was tagged but not published to npm.
+
+### Added
+
+- `skills/chanakya-mcp`: an agent skill (`SKILL.md` plus tool and setup
+  references) that tells an agent which tool answers which question and how
+  to rename, edit and check impact safely.
+
+### Changed
+
+- Tool descriptions no longer claim results are always complete.
+  `get_callers` and `find_references` now say which calls they cannot
+  resolve (untyped values, callbacks, computed names) and that an empty
+  result should be confirmed with `search_code` before treating a symbol as
+  unused.
+- LICENSE copyright now names Aravindh Arumugam.
+
 ## [2.1.2] - 2026-10-28
 
 Two answers that were incomplete are now complete. Existing indexes rebuild

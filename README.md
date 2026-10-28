@@ -75,6 +75,8 @@ In Cursor you can use `"${workspaceFolder}"` as the path.
 
 > **Tip for very large repos:** run the command once in a terminal before connecting your agent, so the first index is already built when the agent starts.
 
+**Agent skill (optional):** the [`chanakya-mcp` skill](https://github.com/aravindh-mb/chanakya-mcp/tree/master/skills/chanakya-mcp) teaches an agent which tool answers which question, plus safe workflows for impact analysis, renames and edits. Copy the `skills/chanakya-mcp` folder into your agent's skills directory (for Claude Code: `.claude/skills/`).
+
 ## Tools
 
 **Find and understand**
