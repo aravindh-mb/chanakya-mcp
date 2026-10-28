@@ -170,7 +170,7 @@
   <header>
     <h1>Chanakya MCP: benchmark results</h1>
     <p>Indexing speed, query speed and token savings, before and after the performance fixes.</p>
-    <div class="meta">Measured 7 October 2026 · Windows 11, 16 cores, Node 24.11.1 · VS Code repository (shallow clone), 14,432 indexed files</div>
+    <div class="meta">Measured 7 October 2026, small-project token results updated 28 October 2026 for 2.1.2 · Windows 11, 16 cores, Node 24.11.1 · VS Code repository (shallow clone), 14,432 indexed files</div>
   </header>
 
   <section class="tiles" aria-label="Headline results">
@@ -273,7 +273,7 @@
     </table>
   </div>
 
-  <h3>This repository (126 files)</h3>
+  <h3>This repository (133 files)</h3>
   <div class="card table-wrap">
     <table>
       <thead><tr><th>Question</th><th>MCP tokens</th><th>Grep + reads</th><th>Saved</th></tr></thead>
@@ -290,7 +290,7 @@
   <h2>Caveats and known issues</h2>
   <div class="card">
     <ul class="notes">
-      <li><span class="flag">Wrong answer</span> On the sample monorepo, <code>get_callers</code> misses <code>service.create_user()</code> and <code>get_dependents</code> misses the 8 files importing <code>@sample/shared</code>. Those two rows look cheap partly because the answers are incomplete. Not fixed yet.</li>
+      <li>Fixed in 2.1.2: on the sample monorepo, <code>get_callers</code> used to miss <code>service.create_user()</code> and <code>get_dependents</code> missed the 8 files importing <code>@sample/shared</code>. Their answers are now complete, which is why those two rows cost more tokens than before (sample savings 55.6% → 45.4%).</li>
       <li>The grep baseline on VS Code is unrealistically expensive (a plain grep for <code>createDecorator</code> returns ~400k tokens). Claude Code caps grep output, so a realistic agent lookup there is closer to ~8,000 tokens, which puts the realistic saving at about 75–99% per lookup, not 98.5%.</li>
       <li>File structure answers are the weakest case: <code>get_file_structure</code> on <code>textModel.ts</code> returned 19,228 tokens versus 27,942 for reading the file (31% saved).</li>
       <li>Peak memory on VS Code is still about 2.9 GB (4 parser workers plus building the indexes at the end). Normal projects measured about 1–1.5 GB.</li>
@@ -344,21 +344,21 @@
   const sample = [
     ['Where is create_user defined', 119, 680],
     ['Everything that uses format_money', 417, 569],
-    ['Who calls user_service.create_user', 22, 680, 'incomplete answer'],
-    ['What does the user service depend on', 171, 298],
-    ['What breaks if the shared types change', 92, 1568, 'incomplete answer'],
+    ['Who calls user_service.create_user', 169, 680],
+    ['What does the user service depend on', 175, 298],
+    ['What breaks if the shared types change', 498, 1568],
     ['Structure of the user service', 517, 298],
     ['Components using use_orders', 410, 389],
-    ['Full working context for user_service', 689, 1006],
+    ['Full working context for user_service', 693, 1006],
   ];
   const repo = [
     ['Where is apply_patch defined', 114, 10665],
     ['Every use of resolve_project_path', 871, 5757],
-    ['Who calls scan_project', 617, 11748],
+    ['Who calls scan_project', 617, 12188],
     ['What does project_file.ts import', 271, 1248],
     ['Structure of src/mcp/server.ts', 1241, 1755],
     ['Every occurrence of handle_line', 656, 4322],
-    ['Full context of mcp_server', 713, 7958],
+    ['Full context of mcp_server', 732, 7958],
   ];
 
   // ---- Tooltip
@@ -434,7 +434,7 @@
     const sum = (rows, i) => rows.reduce((a, r) => a + r[i], 0);
     const data = [
       { label: 'Sample app (16 files)', pct: (1 - sum(sample, 1) / sum(sample, 2)) * 100, detail: `${fmt(sum(sample, 2))} → ${fmt(sum(sample, 1))} tokens` },
-      { label: 'This repo (126 files)', pct: (1 - sum(repo, 1) / sum(repo, 2)) * 100, detail: `${fmt(sum(repo, 2))} → ${fmt(sum(repo, 1))} tokens` },
+      { label: 'This repo (133 files)', pct: (1 - sum(repo, 1) / sum(repo, 2)) * 100, detail: `${fmt(sum(repo, 2))} → ${fmt(sum(repo, 1))} tokens` },
       { label: 'VS Code (14,432 files)', pct: (1 - sum(questions, 4) / sum(questions, 5)) * 100, detail: `${fmt(sum(questions, 5))} → ${fmt(sum(questions, 4))} tokens (baseline inflated, see caveats)` },
     ];
     const root = document.getElementById('savings-chart');

@@ -58,6 +58,7 @@ export interface relationship_row {
   /** Joined from `symbols`. */
   to_id: string | null;
   to_name: string;
+  receiver_type: string | null;
   confidence: string;
   /** Joined from `files`. */
   file_path: string;
@@ -164,6 +165,7 @@ export function to_relationship(row: relationship_row): relationship {
     from_id: row.from_id,
     to_id: from_sql_nullable(row.to_id),
     to_name: row.to_name,
+    receiver_type: from_sql_nullable(row.receiver_type),
     confidence: row.confidence as relationship_confidence,
     file_path: row.file_path,
     line: row.line,

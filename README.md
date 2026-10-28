@@ -35,9 +35,10 @@ read jobs/import.ts    → 700 tokens
 
 ## Why use it
 
-- 🎯 **Fewer tokens.** 56–90% less context than grep + file reads in our benchmarks, and the bigger the repo, the bigger the saving.
+- 🎯 **Fewer tokens.** 45–90% less context than grep + file reads in our benchmarks, and the bigger the repo, the bigger the saving.
 - ⚡ **Fast.** Most lookups take under 15 ms, even on a 14,000-file repository.
-- 🧠 **Structure, not text.** Real definitions, call graphs, references and import graphs from the syntax tree, not fuzzy string matches.
+- 🧠 **Structure, not text.** Real definitions, call graphs, references and import graphs from the syntax tree, not fuzzy string matches. Method calls on typed values (`service.createUser()` with `service: UserService`) resolve to the method.
+- 📦 **Monorepo aware.** Imports of your own workspace packages (`@acme/shared`) resolve to their source, so "what breaks if I change this?" includes every app that uses it.
 - 🔒 **Private.** Runs entirely on your machine. No API keys, no network calls, no source code leaves your computer.
 - ♻️ **Always current.** Incremental reindexing only reparses files that changed; `--watch` keeps it live as you edit.
 
@@ -109,8 +110,8 @@ Measured on Windows 11, Node 24, against the [VS Code](https://github.com/micros
 | First index, 14,432 files             | **3.6 min** (21.3 min in 2.0.x) |
 | Reindex after editing one file        | **6.4 s**                       |
 | Find a definition                     | **~1–12 ms**                    |
-| Tokens vs grep + reads, 16-file app   | **56% fewer**                   |
-| Tokens vs grep + reads, 126-file repo | **90% fewer**                   |
+| Tokens vs grep + reads, 16-file app   | **45% fewer**                   |
+| Tokens vs grep + reads, 133-file repo | **90% fewer**                   |
 
 Numbers come from the benchmark scripts in the source repository (`pnpm run bench`, `pnpm run bench:sample`). Changes behind them are listed in the [changelog](https://unpkg.com/@aravindh-arumugam/chanakya-mcp/CHANGELOG.md).
 

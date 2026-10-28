@@ -31,8 +31,12 @@
  * string index was the single biggest object in the database. `references`
  * now stores a `name_key` pointing into the `reference_names` dictionary, and
  * queries join back out to the name on read.
+ *
+ * v5 adds `relationships.receiver_type`: the declared type of a method call's
+ * receiver (`service: user_service`), which lets the graph pass resolve
+ * `service.create_user()` through the type's import.
  */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 /** Quoted because `references` is a reserved word. */
 export const REFERENCES_TABLE = '"references"';
@@ -105,6 +109,7 @@ CREATE TABLE IF NOT EXISTS relationships (
   from_key   INTEGER,
   to_key     INTEGER,
   to_name    TEXT NOT NULL,
+  receiver_type TEXT,
   confidence TEXT NOT NULL,
   file_id    INTEGER NOT NULL REFERENCES files(file_id) ON DELETE CASCADE,
   line       INTEGER NOT NULL
@@ -172,6 +177,9 @@ CREATE INDEX IF NOT EXISTS idx_rel_name  ON relationships(to_name);
 -- the edges an import binding can name instead of testing every edge.
 DROP INDEX IF EXISTS idx_rel_file;
 CREATE INDEX IF NOT EXISTS idx_rel_file_name ON relationships(file_id, to_name);
+-- Only typed method calls carry a receiver type, so the index is partial.
+CREATE INDEX IF NOT EXISTS idx_rel_file_receiver ON relationships(file_id, receiver_type)
+  WHERE receiver_type IS NOT NULL;
 
 -- (name_key, file_id) rather than name_key alone, for the same reason: graph
 -- resolution looks up "uses of this imported name in this file".

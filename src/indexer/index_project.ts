@@ -213,7 +213,11 @@ export async function index_project(options: index_project_options): Promise<ind
     // With the per-file graph stored, follow imports across files and point
     // every unresolved call edge at the symbol it actually calls.
     const graph_started_at = Date.now();
-    resolve_project_graph(options.logger === undefined ? { store } : { store, logger: options.logger });
+    resolve_project_graph({
+      store,
+      root_path,
+      ...(options.logger === undefined ? {} : { logger: options.logger }),
+    });
     store.optimize();
     timings.graph_ms = Date.now() - graph_started_at;
   }

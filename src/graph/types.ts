@@ -42,6 +42,12 @@ export interface dependent_hit {
   readonly specifiers: readonly string[];
   /** Line of the first import or re-export of the target. */
   readonly line: number;
+  /**
+   * Set when the file reaches the target through a re-exporting barrel rather
+   * than importing it directly: the barrel it imports from. Present only when
+   * the file binds a name the target itself exports, or the whole module.
+   */
+  readonly via?: string;
 }
 
 export interface dependents_result {

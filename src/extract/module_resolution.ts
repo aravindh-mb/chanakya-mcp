@@ -95,8 +95,16 @@ export function resolve_module_specifier(options: resolve_module_specifier_optio
   }
 
   const from_directory = posix.dirname(from_file_path);
-  const base = posix.normalize(posix.join(from_directory, module_specifier));
+  return resolve_path_candidate(posix.normalize(posix.join(from_directory, module_specifier)), files);
+}
 
+/**
+ * The indexed file a project-relative path names, trying it exactly, then with
+ * its written output extension swapped for a source one, then with each source
+ * extension appended, then as a directory `index`. The same rules TypeScript
+ * applies to a relative specifier, shared with workspace package resolution.
+ */
+export function resolve_path_candidate(base: string, files: file_index): string | undefined {
   if (files.has(base)) {
     return base;
   }

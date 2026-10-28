@@ -296,11 +296,14 @@ export class index_store {
   /**
    * Unresolved call edges that *can* resolve through the import bindings with
    * keys in (`after_key`, `last_key`]: edges in the binding's own file whose
-   * name is the binding or starts with "binding.". These are the only edges
-   * the resolution pass can follow.
+   * name is the binding or starts with "binding.", or whose receiver is
+   * declared with the binding as its type. These are the only edges the
+   * resolution pass can follow.
    */
   get_resolvable_call_edges(after_key: number, last_key: number): readonly relationship[] {
     const rows = this.#statements.select_resolvable_calls_in_import_range.all(
+      after_key,
+      last_key,
       after_key,
       last_key,
       after_key,
@@ -597,6 +600,7 @@ export class index_store {
       from_key,
       resolve_key(edge.to_id),
       edge.to_name,
+      edge.receiver_type ?? null,
       edge.confidence,
       file_id,
       edge.line,
@@ -777,7 +781,7 @@ function prepare_statements(db: database_handle): prepared_statements {
   // `from_id` is the enclosing symbol's id, or the file path for file-level
   // edges; `to_id` is the target symbol's id, or NULL while unresolved.
   const relationships_select = `
-    SELECT r.key, r.kind, r.to_name, r.confidence, r.line, f.file_path,
+    SELECT r.key, r.kind, r.to_name, r.receiver_type, r.confidence, r.line, f.file_path,
            CASE WHEN r.from_key IS NULL OR fs.id IS NULL THEN f.file_path ELSE fs.id END AS from_id,
            ts.id AS to_id
     FROM relationships r
@@ -822,8 +826,8 @@ function prepare_statements(db: database_handle): prepared_statements {
        RETURNING key`,
     ),
     insert_relationship: db.prepare(
-      `INSERT INTO relationships (kind, from_key, to_key, to_name, confidence, file_id, line)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO relationships (kind, from_key, to_key, to_name, receiver_type, confidence, file_id, line)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     ),
     insert_reference: db.prepare(
       `INSERT INTO ${REFERENCES_TABLE} (file_id, name_key, symbol_key, enclosing_symbol_key,
@@ -880,7 +884,12 @@ function prepare_statements(db: database_handle): prepared_statements {
          UNION
          SELECT e.key FROM imports i CROSS JOIN relationships e
            ON e.file_id = i.file_id AND e.to_name > i.local_name || '.' AND e.to_name < i.local_name || '/'
-         WHERE i.key > ? AND i.key <= ? AND +e.kind = 'calls' AND +e.to_key IS NULL)
+         WHERE i.key > ? AND i.key <= ? AND +e.kind = 'calls' AND +e.to_key IS NULL
+         UNION
+         SELECT e.key FROM imports i CROSS JOIN relationships e INDEXED BY idx_rel_file_receiver
+           ON e.file_id = i.file_id AND e.receiver_type = i.local_name
+         WHERE i.key > ? AND i.key <= ? AND e.receiver_type IS NOT NULL
+           AND +e.kind = 'calls' AND +e.to_key IS NULL)
        ORDER BY r.key`,
     ),
     select_all_imports: db.prepare(`${imports_select}`),

@@ -21,10 +21,37 @@ All notable changes are documented here. The format is based on
 - CI workflow running typecheck, lint, tests and the build on Linux, macOS and
   Windows under Node 20 and 22.
 
+## [2.1.2] - 2026-10-28
+
+Two answers that were incomplete are now complete. Existing indexes rebuild
+once on first run (schema v5).
+
+### Fixed
+
+- `get_callers` missed method calls made through a typed value:
+  `service.create_user()` with `service: user_service`, a variable built with
+  `new user_service()`, or `this.users.find()` through a typed field or
+  constructor parameter property. The receiver's declared type is now
+  recorded and followed through its import. Only plainly written types count;
+  untyped, destructured, shadowed and rebound-`this` receivers stay
+  unresolved. On VS Code's `src/vs/platform` this resolves 18% more calls
+  (92,068 → 108,619) with no slower indexing.
+- `get_dependents` missed monorepo apps that import a shared package by name
+  (`@acme/shared`). Imports of the repository's own workspace packages now
+  resolve through their `package.json` (`source`, `types`, `exports`,
+  `module`, `main`, then `src/index`), and dependents are followed through
+  re-exporting barrels. A file reached through a barrel is listed, with a
+  `via` field, only when it imports a name the target itself exports.
+
+### Changed
+
+- The sample benchmark project now has the `package.json` files a real
+  workspace has. With complete answers its token saving is 45.4% (was 55.6%).
+
 ## [2.1.1] - 2026-10-08
 
-First public release of these changes (2.1.0 was staged on npm but never
-published).
+Same changes as 2.1.0, which was held in npm's staging when this was released
+and became public later.
 
 Large-repository performance. On VS Code (14,432 files) the first index went
 from 21.3 to 3.6 minutes and a one-file reindex from 14.5 to 6.4 seconds, with

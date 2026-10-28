@@ -97,3 +97,96 @@ describe('extract_calls', () => {
     expect(edges[0]?.to_id).toBeUndefined();
   });
 });
+
+describe('extract_calls typed receivers', () => {
+  const edge_for = (edges: readonly relationship[], name: string): relationship | undefined =>
+    edges.find((edge) => edge.to_name === name);
+
+  it('records the declared type of a parameter receiver', () => {
+    const { edges } = extract('function run(service: user_service) { service.create_user(); }');
+    expect(edge_for(edges, 'service.create_user')?.receiver_type).toBe('user_service');
+  });
+
+  it('records the type of a variable annotated or built with new', () => {
+    const { edges } = extract(
+      'function run() { const a: user_service = make(); const b = new order_service(); a.go(); b.place(); }',
+    );
+    expect(edge_for(edges, 'a.go')?.receiver_type).toBe('user_service');
+    expect(edge_for(edges, 'b.place')?.receiver_type).toBe('order_service');
+  });
+
+  it('uses the base of a generic type', () => {
+    const { edges } = extract('function run(repo: repository<user>) { repo.save(); }');
+    expect(edge_for(edges, 'repo.save')?.receiver_type).toBe('repository');
+  });
+
+  it('records the type of a this-field and a constructor parameter property', () => {
+    const { edges } = extract(`class svc {
+  private readonly users: user_repository;
+  constructor(private readonly orders: order_repository) {}
+  run() { this.users.find(); this.orders.list(); }
+}`);
+    expect(edge_for(edges, 'this.users.find')?.receiver_type).toBe('user_repository');
+    expect(edge_for(edges, 'this.orders.list')?.receiver_type).toBe('order_repository');
+  });
+
+  it('resolves a typed call to a class declared in the same file', () => {
+    const { edges, symbol_name_by_id } = extract(`class user_service { create_user() {} }
+function run(service: user_service) { service.create_user(); }`);
+    const edge = edge_for(edges, 'service.create_user');
+    expect(edge?.to_id).toBeDefined();
+    expect(symbol_name_by_id.get(edge!.to_id!)).toBe('create_user');
+    expect(edge?.receiver_type).toBeUndefined();
+  });
+
+  it('leaves untyped, destructured and inferred receivers alone', () => {
+    const { edges } = extract(`function run(plain, { svc }: deps, cb = make()) {
+  const made = make();
+  plain.go(); svc.go(); made.go(); cb.go();
+}`);
+    for (const name of ['plain.go', 'svc.go', 'made.go', 'cb.go']) {
+      expect(edge_for(edges, name)?.receiver_type).toBeUndefined();
+    }
+  });
+
+  it('respects shadowing by a nearer untyped declaration', () => {
+    const { edges } = extract(`function run(service: user_service) {
+  { const service = make(); service.create_user(); }
+  for (const service of list) { service.create_user(); }
+  try {} catch (service) { service.create_user(); }
+}`);
+    expect(
+      edges
+        .filter((edge) => edge.to_name === 'service.create_user')
+        .every((edge) => edge.receiver_type === undefined),
+    ).toBe(true);
+  });
+
+  it('does not treat a use in a loop head as a declaration', () => {
+    const { edges } = extract(
+      'function run(service: user_service) { for (const x of service.all()) { service.save(x); } }',
+    );
+    expect(edge_for(edges, 'service.all')?.receiver_type).toBe('user_service');
+    expect(edge_for(edges, 'service.save')?.receiver_type).toBe('user_service');
+  });
+
+  it('does not follow this into a function or object method that rebinds it', () => {
+    const { edges } = extract(`class svc {
+  constructor(private readonly orders: order_repository) {}
+  run() {
+    const arrow = () => this.orders.arrow_call();
+    function inner() { this.orders.plain_call(); }
+    const object = { method() { this.orders.object_call(); } };
+  }
+}`);
+    expect(edge_for(edges, 'this.orders.arrow_call')?.receiver_type).toBe('order_repository');
+    expect(edge_for(edges, 'this.orders.plain_call')?.receiver_type).toBeUndefined();
+    expect(edge_for(edges, 'this.orders.object_call')?.receiver_type).toBeUndefined();
+  });
+
+  it('ignores union and qualified types', () => {
+    const { edges } = extract('function run(a: user_service | null, b: ns.user_service) { a.go(); b.go(); }');
+    expect(edge_for(edges, 'a.go')?.receiver_type).toBeUndefined();
+    expect(edge_for(edges, 'b.go')?.receiver_type).toBeUndefined();
+  });
+});

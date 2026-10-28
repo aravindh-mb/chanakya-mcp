@@ -25,6 +25,7 @@ import type { relationship } from '../model/relationship.js';
 import type { code_symbol } from '../model/symbol.js';
 import { resolve_module_specifier, type file_index } from '../extract/module_resolution.js';
 import type { index_store } from '../store/index_store.js';
+import { find_workspace_packages, resolve_workspace_specifier } from './workspace_packages.js';
 
 /** How far to chase re-export chains before giving up. */
 const MAX_RE_EXPORT_DEPTH = 8;
@@ -56,6 +57,12 @@ function* by_import_page<row_type>(
 export interface resolve_project_graph_options {
   readonly store: index_store;
   readonly logger?: logger;
+  /**
+   * The project root on disk. When given, bare imports of the repository's own
+   * workspace packages (`@acme/shared`) are resolved to their files; see
+   * `workspace_packages.ts`.
+   */
+  readonly root_path?: string;
 }
 
 export interface resolve_project_graph_result {
@@ -77,18 +84,24 @@ export function resolve_project_graph(options: resolve_project_graph_options): r
 
   store.transaction(() => {
     const files: file_index = new Set(store.list_file_paths());
+    const packages =
+      options.root_path === undefined ? undefined : find_workspace_packages(options.root_path, files);
 
     // Imports: fill in any specifier resolution the per-file extractor could
     // not do (it may have run without the full file set), then index by file.
     const imports_by_file = new Map<string, code_import[]>();
     for (const item of store.get_all_imports()) {
       let resolved = item;
-      if (resolved.resolved_path === undefined && item.is_internal) {
-        const target = resolve_module_specifier({
-          from_file_path: item.file_path,
-          module_specifier: item.module_specifier,
-          files,
-        });
+      if (resolved.resolved_path === undefined) {
+        const target = item.is_internal
+          ? resolve_module_specifier({
+              from_file_path: item.file_path,
+              module_specifier: item.module_specifier,
+              files,
+            })
+          : packages === undefined
+            ? undefined
+            : resolve_workspace_specifier(item.module_specifier, packages, files);
         if (target !== undefined) {
           store.set_import_resolved_path(item.id!, target);
           resolved = { ...item, resolved_path: target };
@@ -146,7 +159,15 @@ function resolve_edge_target(
   store: index_store,
 ): string | undefined {
   const from_file = edge.file_path;
-  const segments = edge.to_name.split('.');
+  const written = edge.to_name.split('.');
+  // A typed receiver is a local value, so its declared type replaces it: the
+  // written name may even shadow an import, and must not be followed.
+  // `service.create_user` becomes `user_service.create_user`, and
+  // `this.orders.list` becomes `order_repository.list`.
+  const segments =
+    edge.receiver_type === undefined
+      ? written
+      : [edge.receiver_type, ...written.slice(written[0] === 'this' ? 2 : 1)];
   const binding = segments[0] as string;
 
   const imports = imports_by_file.get(from_file) ?? [];

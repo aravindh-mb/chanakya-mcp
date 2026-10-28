@@ -36,6 +36,17 @@ interface dependent_accum {
   readonly local_names: string[];
   readonly specifiers: string[];
   line: number;
+  via?: string;
+}
+
+/** How many barrels deep to follow re-exports before stopping. */
+const MAX_BARREL_DEPTH = 8;
+
+/** A file that re-exports from some target: `export * from './types'`. */
+interface re_exporter {
+  readonly file_path: string;
+  readonly specifier: string;
+  readonly line: number;
 }
 
 /** Every module a file pulls in, grouped by target. */
@@ -48,27 +59,73 @@ export function get_dependencies(options: graph_options, file_path: string): dep
   return { dependencies };
 }
 
-/** Every file that pulls a module in, either by importing or re-exporting it. */
+/**
+ * Every file that pulls a module in: by importing it, by re-exporting it, or
+ * by importing it through a re-exporting barrel.
+ *
+ * The barrel case is what makes "what breaks if I change this file?" honest in
+ * a monorepo, where apps import `@acme/shared` and never name
+ * `shared/src/types.ts` directly. It is followed precisely: a file reached
+ * through a barrel is listed only when it binds a name the target itself
+ * exports, or takes the whole module (a namespace import, `require`, dynamic
+ * `import()`). A file importing only some other module's names from the same
+ * barrel does not depend on the target and is not listed.
+ */
 export function get_dependents(options: graph_options, file_path: string): dependents_result {
   const store = options.store;
+  const re_exporters = re_exporters_by_target(store);
 
   const by_file = new Map<string, dependent_accum>();
   for (const item of store.get_imports_resolved_to(file_path)) {
-    let acc = by_file.get(item.file_path);
-    if (acc === undefined) {
-      acc = { kind: 'import', local_names: [], specifiers: [], line: item.line };
-      by_file.set(item.file_path, acc);
-    }
-    push_unique(acc.local_names, item.local_name);
-    push_unique(acc.specifiers, item.module_specifier);
-    if (item.line < acc.line) {
-      acc.line = item.line;
-    }
+    add_import(by_file, item, undefined);
   }
-
   // A re-exporting file (`export * from './user'`) depends on its source even
   // though it binds no name from it.
+  for (const item of re_exporters.get(file_path) ?? []) {
+    add_re_export(by_file, item, undefined);
+  }
+
+  // Follow the barrels outwards, breadth first, so the nearest barrel is the
+  // one reported as `via`.
+  const target_names = new Set(store.get_exports_in_file(file_path).map((item) => item.exported_name));
+  const visited = new Set<string>([file_path]);
+  let barrels = (re_exporters.get(file_path) ?? []).map((item) => item.file_path);
+  for (const barrel of barrels) {
+    visited.add(barrel);
+  }
+  for (let depth = 0; depth < MAX_BARREL_DEPTH && barrels.length > 0; depth += 1) {
+    const next: string[] = [];
+    for (const barrel of barrels) {
+      for (const item of store.get_imports_resolved_to(barrel)) {
+        if (item.file_path !== file_path && binds_from_target(item, target_names)) {
+          add_import(by_file, item, barrel);
+        }
+      }
+      for (const item of re_exporters.get(barrel) ?? []) {
+        if (visited.has(item.file_path)) {
+          continue;
+        }
+        visited.add(item.file_path);
+        add_re_export(by_file, item, barrel);
+        next.push(item.file_path);
+      }
+    }
+    barrels = next;
+  }
+
+  const dependents = [...by_file.entries()]
+    .map(([path, acc]) => {
+      const { via, ...rest } = acc;
+      return via === undefined ? { file_path: path, ...rest } : { file_path: path, ...rest, via };
+    })
+    .sort((left, right) => left.file_path.localeCompare(right.file_path));
+  return { dependents };
+}
+
+/** Every file that re-exports from each target, keyed by the target's path. */
+function re_exporters_by_target(store: index_store): Map<string, re_exporter[]> {
   const files: file_index = new Set(store.list_file_paths());
+  const by_target = new Map<string, re_exporter[]>();
   for (const item of store.get_all_exports()) {
     if (item.kind !== 're_export' || item.module_specifier === undefined) {
       continue;
@@ -78,24 +135,80 @@ export function get_dependents(options: graph_options, file_path: string): depen
       module_specifier: item.module_specifier,
       files,
     });
-    if (target !== file_path) {
+    if (target === undefined) {
       continue;
     }
-    let acc = by_file.get(item.file_path);
-    if (acc === undefined) {
-      acc = { kind: 're_export', local_names: [], specifiers: [], line: item.line };
-      by_file.set(item.file_path, acc);
-    }
-    push_unique(acc.specifiers, item.module_specifier);
-    if (item.line < acc.line) {
-      acc.line = item.line;
+    const bucket = by_target.get(target);
+    const entry = { file_path: item.file_path, specifier: item.module_specifier, line: item.line };
+    if (bucket === undefined) {
+      by_target.set(target, [entry]);
+    } else {
+      bucket.push(entry);
     }
   }
+  return by_target;
+}
 
-  const dependents = [...by_file.entries()]
-    .map(([file_path, acc]) => ({ file_path, ...acc }))
-    .sort((left, right) => left.file_path.localeCompare(right.file_path));
-  return { dependents };
+/** Whether an import of a barrel takes anything the target exports. */
+function binds_from_target(item: code_import, target_names: ReadonlySet<string>): boolean {
+  switch (item.kind) {
+    case 'namespace':
+    case 'require':
+    case 'dynamic':
+      return true;
+    case 'default':
+      return target_names.has('default');
+    case 'named':
+      return item.imported_name !== undefined && target_names.has(item.imported_name);
+    case 'side_effect':
+      return false;
+  }
+}
+
+function add_import(by_file: Map<string, dependent_accum>, item: code_import, via: string | undefined): void {
+  let acc = by_file.get(item.file_path);
+  if (acc === undefined) {
+    acc = {
+      kind: 'import',
+      local_names: [],
+      specifiers: [],
+      line: item.line,
+      ...(via === undefined ? {} : { via }),
+    };
+    by_file.set(item.file_path, acc);
+  } else if (acc.via !== via) {
+    // Already a dependent by a nearer route; the nearest one is reported.
+    return;
+  }
+  push_unique(acc.local_names, item.local_name);
+  push_unique(acc.specifiers, item.module_specifier);
+  if (item.line < acc.line) {
+    acc.line = item.line;
+  }
+}
+
+function add_re_export(
+  by_file: Map<string, dependent_accum>,
+  item: re_exporter,
+  via: string | undefined,
+): void {
+  let acc = by_file.get(item.file_path);
+  if (acc === undefined) {
+    acc = {
+      kind: 're_export',
+      local_names: [],
+      specifiers: [],
+      line: item.line,
+      ...(via === undefined ? {} : { via }),
+    };
+    by_file.set(item.file_path, acc);
+  } else if (acc.via !== via) {
+    return;
+  }
+  push_unique(acc.specifiers, item.specifier);
+  if (item.line < acc.line) {
+    acc.line = item.line;
+  }
 }
 
 function group_imports(

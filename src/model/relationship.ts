@@ -78,6 +78,15 @@ export interface relationship {
    * useful information for an agent and for later resolution passes.
    */
   readonly to_name: string;
+  /**
+   * For a method call on a value, the type that value is declared with, when
+   * the source states it plainly: `service: user_service`, `new
+   * user_service()`, or a typed class field reached through `this`. The
+   * resolution pass follows this type's import the way it follows a binding's,
+   * so `service.create_user()` resolves to `user_service.create_user`. Absent
+   * whenever the type is not written down — it is never inferred.
+   */
+  readonly receiver_type?: string | undefined;
   readonly confidence: relationship_confidence;
   /** POSIX path of the file the edge was observed in. */
   readonly file_path: string;

@@ -257,3 +257,55 @@ describe('resolve_project_graph: large inputs', () => {
     expect(helper_call?.to_id).toBeUndefined();
   });
 });
+
+describe('resolve_project_graph: typed receivers', () => {
+  it('resolves a method call on a parameter typed with an imported class', () => {
+    index([
+      ['src/user.ts', USER],
+      [
+        'src/routes.ts',
+        "import { user_service } from './user';\nexport function routes(service: user_service) { service.create_user(); }\n",
+      ],
+    ]);
+
+    const routes = store.find_symbols_by_name('routes')[0];
+    const edge = calls(store.get_relationships_from(routes!.id)).find(
+      (e) => e.to_name === 'service.create_user',
+    );
+
+    expect(edge?.to_id).toBe('src/user.ts#method:user_service.create_user');
+    expect(edge?.confidence).toBe('resolved');
+  });
+
+  it('resolves a call through a constructor parameter property', () => {
+    index([
+      ['src/user.ts', USER],
+      [
+        'src/app.ts',
+        "import { user_service } from './user';\nexport class app {\n  constructor(private readonly users: user_service) {}\n  start() { this.users.create_user(); }\n}\n",
+      ],
+    ]);
+
+    const start = store.find_symbols_by_name('start')[0];
+    const edge = calls(store.get_relationships_from(start!.id))[0];
+
+    expect(edge?.to_id).toBe('src/user.ts#method:user_service.create_user');
+  });
+
+  it('does not follow an import the typed receiver shadows', () => {
+    // `user_service` is imported, but here it names a local parameter typed
+    // with a type that is not imported, so nothing may resolve.
+    index([
+      ['src/user.ts', USER],
+      [
+        'src/app.ts',
+        "import { user_service } from './user';\nexport function main(user_service: other_type) { user_service.create_user(); }\n",
+      ],
+    ]);
+
+    const main = store.find_symbols_by_name('main')[0];
+    const edge = calls(store.get_relationships_from(main!.id))[0];
+
+    expect(edge?.to_id).toBeUndefined();
+  });
+});

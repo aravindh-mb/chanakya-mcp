@@ -14,6 +14,7 @@
 import type { parsed_file } from '../parser/types.js';
 import type { relationship } from '../model/relationship.js';
 import type { code_symbol } from '../model/symbol.js';
+import { receiver_type_of } from './receiver_type.js';
 import {
   build_scope_index,
   build_start_index,
@@ -58,13 +59,29 @@ export function extract_calls(options: extract_calls_options): readonly relation
 
     const chain = read_chain(callee);
     const to_name = chain === undefined ? callee.text : chain.join('.');
-    const to_id = chain === undefined ? undefined : resolve_member_chain(scope, chain, enclosing_id)?.id;
+    let to_id = chain === undefined ? undefined : resolve_member_chain(scope, chain, enclosing_id)?.id;
+
+    // A method call on a typed value: `service.create_user()` with
+    // `service: user_service`. A type declared in this file resolves now;
+    // an imported one is carried as `receiver_type` for the graph pass.
+    let receiver_type: string | undefined;
+    if (to_id === undefined && chain !== undefined) {
+      const receiver = receiver_type_of(callee, chain);
+      if (receiver !== undefined) {
+        const typed_chain = [receiver.type_name, ...chain.slice(receiver.receiver_length)];
+        to_id = resolve_member_chain(scope, typed_chain, enclosing_id)?.id;
+        if (to_id === undefined) {
+          receiver_type = receiver.type_name;
+        }
+      }
+    }
 
     edges.push({
       kind: 'calls',
       from_id: enclosing_id ?? relative_path,
       to_id,
       to_name,
+      ...(receiver_type === undefined ? {} : { receiver_type }),
       confidence: 'certain',
       file_path: relative_path,
       line: node.range.start.line,
